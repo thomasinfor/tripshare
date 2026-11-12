@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Spot } from '../types';
 import { formatCoords } from '../utils/geo';
+import { getMediaUrl } from '../utils/media';
 import {
   Box,
   Typography,
-  Stack,
   Chip,
   IconButton,
   Tooltip,
@@ -14,8 +14,6 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ExploreIcon from '@mui/icons-material/Explore';
 
 interface SpotShowcaseProps {
@@ -28,6 +26,134 @@ interface SpotShowcaseProps {
   onOpenLightbox: (imageUrl: string) => void;
 }
 
+interface StackPhotoItemProps {
+  assetId: string;
+  index: number;
+  spotName: string;
+  onOpenLightbox: (assetId: string) => void;
+}
+
+const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
+  assetId,
+  index,
+  spotName,
+  onOpenLightbox,
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const thumbUrl = getMediaUrl(assetId, 'thumbnail');
+  const previewUrl = getMediaUrl(assetId, 'preview');
+
+  return (
+    <Box
+      onClick={() => onOpenLightbox(assetId)}
+      sx={{
+        position: 'relative',
+        width: '100%',
+        borderRadius: 2,
+        overflow: 'hidden',
+        bgcolor: '#050811',
+        cursor: 'zoom-in',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+        '&:hover': {
+          borderColor: 'rgba(56, 189, 248, 0.5)',
+          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.6)',
+        },
+        '&:hover .photo-zoom-img': {
+          transform: 'scale(1.025)',
+        },
+        '&:hover .photo-hover-overlay': {
+          opacity: 1,
+        },
+      }}
+    >
+      {/* Fast intrinsic-ratio thumbnail placeholder */}
+      <Box
+        component="img"
+        src={thumbUrl}
+        alt=""
+        loading={index < 6 ? 'eager' : 'lazy'}
+        sx={{
+          display: 'block',
+          width: '100%',
+          height: 'auto',
+          minHeight: 90,
+          filter: isLoaded ? 'none' : 'blur(10px)',
+          transform: isLoaded ? 'none' : 'scale(1.03)',
+          opacity: isLoaded ? 0 : 0.9,
+          transition: 'opacity 0.35s ease',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Crisp preview image overlaid cleanly with zero layout shift */}
+      <Box
+        component="img"
+        className="photo-zoom-img"
+        src={previewUrl}
+        alt={`${spotName} - Photo ${index + 1}`}
+        loading={index < 4 ? 'eager' : 'lazy'}
+        onLoad={() => setIsLoaded(true)}
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 0.35s ease, transform 0.35s ease',
+        }}
+      />
+
+      {/* Subtle hover controls */}
+      <Box
+        className="photo-hover-overlay"
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.45) 100%)',
+          opacity: 0,
+          transition: 'opacity 0.2s ease',
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          p: 1,
+        }}
+      >
+        <Chip
+          label={`#${index + 1}`}
+          size="small"
+          sx={{
+            height: 20,
+            fontSize: 10.5,
+            fontWeight: 700,
+            bgcolor: 'rgba(15, 23, 42, 0.8)',
+            color: '#f8fafc',
+            backdropFilter: 'blur(6px)',
+          }}
+        />
+        <Box
+          sx={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            bgcolor: 'rgba(15, 23, 42, 0.8)',
+            backdropFilter: 'blur(6px)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <FullscreenIcon sx={{ fontSize: 16 }} />
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
 export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   spot,
   spotNumber,
@@ -37,86 +163,107 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   distanceFromPrev,
   onOpenLightbox,
 }) => {
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-
-  useEffect(() => {
-    setActiveImageIndex(0);
-  }, [spot.id, spot.name]);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [singleLoaded, setSingleLoaded] = useState(false);
 
   const images = spot.images && spot.images.length > 0 ? spot.images : [];
-  const currentImage = images[activeImageIndex] || '';
+  const isSingleImage = images.length === 1;
 
-  const handlePrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
-  };
+  useEffect(() => {
+    setSingleLoaded(false);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [spot.id, spot.name]);
 
-  const handleNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
-  };
+  // Split images into 2 top-to-bottom column stacks (even indices left, odd indices right)
+  const leftStack = images
+    .map((assetId, index) => ({ assetId, index }))
+    .filter((_, idx) => idx % 2 === 0);
+  const rightStack = images
+    .map((assetId, index) => ({ assetId, index }))
+    .filter((_, idx) => idx % 2 === 1);
 
-  const getTagFromFilename = (filename: string) => {
-    if (filename.includes('LONG_EXPOSURE')) return 'Long Exposure';
-    if (filename.includes('NIGHT')) return 'Night Sky / Aurora';
-    if (filename.includes('MACRO')) return 'Macro Focus';
-    return null;
-  };
-
-  const currentTag = currentImage ? getTagFromFilename(currentImage) : null;
-  const driveDist = spot.driving_distance_km || distanceFromPrev;
-  const driveTime = spot.driving_duration_min;
+  const singleAssetId = images[0] || '';
+  const singleThumbUrl = singleAssetId ? getMediaUrl(singleAssetId, 'thumbnail') : '';
+  const singlePreviewUrl = singleAssetId ? getMediaUrl(singleAssetId, 'preview') : '';
 
   return (
     <Box
+      ref={scrollContainerRef}
       sx={{
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
-        p: { xs: 2, sm: 3 },
+        p: { xs: 2, sm: 2.5 },
         gap: 2,
-        overflowY: 'auto',
+        overflowY: isSingleImage ? 'hidden' : 'auto',
+        overflowX: 'hidden',
+        bgcolor: '#0a0f1d',
+        background: 'linear-gradient(180deg, #0f172a 0%, #070b14 100%)',
+        '&::-webkit-scrollbar': { width: 6 },
+        '&::-webkit-scrollbar-thumb': {
+          bgcolor: 'rgba(255, 255, 255, 0.18)',
+          borderRadius: 3,
+        },
       }}
     >
-      {/* Spot Header */}
-      <Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1, alignItems: 'center' }}>
+      {/* Top Header / Meta */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <Chip
-            icon={<ExploreIcon sx={{ fontSize: '14px !important', color: `${dayColor} !important` }} />}
-            label={`Spot ${spotNumber} of ${totalSpots}`}
             size="small"
+            label={dayTitle}
             sx={{
-              backgroundColor: 'rgba(56, 189, 248, 0.12)',
-              color: '#38bdf8',
-              borderColor: 'rgba(56, 189, 248, 0.3)',
+              bgcolor: 'rgba(255, 255, 255, 0.08)',
+              color: dayColor,
               fontWeight: 700,
+              fontSize: 12,
+              border: `1px solid ${dayColor}40`,
             }}
           />
           <Chip
-            label={dayTitle}
             size="small"
-            sx={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'text.secondary' }}
+            icon={<ExploreIcon sx={{ fontSize: 14, color: '#38bdf8 !important' }} />}
+            label={`Stop ${spotNumber} of ${totalSpots}`}
+            sx={{
+              bgcolor: 'rgba(56, 189, 248, 0.1)',
+              color: '#38bdf8',
+              fontWeight: 600,
+              fontSize: 12,
+            }}
           />
-          {driveDist !== undefined && driveDist > 0 && (
+          {distanceFromPrev !== undefined && distanceFromPrev > 0 && (
             <Chip
-              icon={<DirectionsCarIcon sx={{ fontSize: '14px !important', color: '#34d399 !important' }} />}
-              label={`+${driveDist} km drive${driveTime ? ` (~${driveTime} min)` : ''}`}
               size="small"
+              icon={<DirectionsCarIcon sx={{ fontSize: 14, color: '#94a3b8 !important' }} />}
+              label={`${distanceFromPrev} km`}
               sx={{
-                backgroundColor: 'rgba(16, 185, 129, 0.14)',
-                color: '#34d399',
-                borderColor: 'rgba(16, 185, 129, 0.3)',
-                fontWeight: 600,
+                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                color: 'text.secondary',
+                fontSize: 12,
               }}
             />
           )}
         </Box>
 
-        <Typography variant="h4" component="h1" sx={{ color: '#ffffff', mb: 1.2, lineHeight: 1.25 }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{
+            fontWeight: 800,
+            fontSize: { xs: '1.35rem', sm: '1.75rem' },
+            letterSpacing: '-0.02em',
+            color: '#f8fafc',
+            mt: 0.25,
+            lineHeight: 1.25,
+          }}
+        >
           {spot.name}
         </Typography>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5, alignItems: 'center' }}>
+        {/* Location & Time Subbar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           {spot.time && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: 13 }}>
               <AccessTimeIcon sx={{ fontSize: 15 }} />
@@ -131,223 +278,214 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             <PhotoCameraIcon sx={{ fontSize: 15 }} />
             <span>{images.length} {images.length === 1 ? 'Photo' : 'Photos'}</span>
           </Box>
+          {spot.google_maps_place?.url && (
+            <Box
+              component="a"
+              href={spot.google_maps_place.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: '#38bdf8',
+                fontSize: 13,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              <span>View on Google Maps ↗</span>
+            </Box>
+          )}
         </Box>
 
         {spot.description && (
-          <Typography variant="body2" sx={{ color: '#cbd5e1', lineHeight: 1.6 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              color: '#cbd5e1',
+              lineHeight: 1.55,
+              ...(isSingleImage
+                ? {
+                    display: '-webkit-box',
+                    WebkitLineClamp: { xs: 2, sm: 3 },
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }
+                : {}),
+            }}
+          >
             {spot.description}
           </Typography>
         )}
       </Box>
 
-      {/* Image Gallery */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 1.5 }}>
-        {images.length > 0 ? (
+      {/* Gallery Body */}
+      {images.length === 0 ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 6,
+            color: 'text.secondary',
+          }}
+        >
+          <PhotoCameraIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
+          <Typography variant="body2">No photos recorded for this spot</Typography>
+        </Box>
+      ) : isSingleImage ? (
+        /* Single Image Mode: Full width, bounded height so it never overflows vertically */
+        <Box
+          onClick={() => onOpenLightbox(singleAssetId)}
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            width: '100%',
+            position: 'relative',
+            borderRadius: 2.5,
+            overflow: 'hidden',
+            bgcolor: '#050811',
+            cursor: 'zoom-in',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          {/* Ambient full-width backdrop for portrait or ultra-wide aspect ratios */}
           <Box
-            onClick={() => onOpenLightbox(currentImage)}
+            component="img"
+            src={singleThumbUrl}
+            alt=""
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'blur(28px) brightness(0.42)',
+              transform: 'scale(1.1)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Progressive crisp foreground image constrained cleanly within panel height */}
+          <Box
+            component="img"
+            key={`single-thumb-${singleAssetId}`}
+            src={singleThumbUrl}
+            alt=""
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: singleLoaded ? 'none' : 'blur(12px)',
+              opacity: singleLoaded ? 0 : 0.9,
+              transition: 'opacity 0.35s ease',
+              pointerEvents: 'none',
+            }}
+          />
+
+          <Box
+            component="img"
+            key={`single-preview-${singleAssetId}`}
+            src={singlePreviewUrl}
+            alt={`${spot.name} - Photo 1`}
+            loading="eager"
+            onLoad={() => setSingleLoaded(true)}
+            sx={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              opacity: singleLoaded ? 1 : 0.15,
+              transition: 'opacity 0.35s ease, transform 0.35s ease',
+              '&:hover': {
+                transform: 'scale(1.015)',
+              },
+            }}
+          />
+
+          <Tooltip title="View Fullscreen" arrow>
+            <IconButton
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenLightbox(singleAssetId);
+              }}
+              size="small"
+              sx={{
+                position: 'absolute',
+                bottom: 12,
+                right: 12,
+                bgcolor: 'rgba(15, 23, 42, 0.8)',
+                backdropFilter: 'blur(8px)',
+                color: '#ffffff',
+                '&:hover': { bgcolor: '#0284c7' },
+              }}
+            >
+              <FullscreenIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      ) : (
+        /* Multi-Image Mode: 2-Column Top-to-Bottom Image Stacks */
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 1.5,
+            width: '100%',
+            pb: 1,
+          }}
+        >
+          {/* Column 1 Stack */}
+          <Box
             sx={{
               flex: 1,
-              position: 'relative',
-              borderRadius: 3,
-              overflow: 'hidden',
-              bgcolor: '#000',
-              cursor: 'zoom-in',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              minHeight: 200,
-            }}
-          >
-            <Box
-              component="img"
-              key={currentImage}
-              src={currentImage}
-              alt={`${spot.name} - Photo ${activeImageIndex + 1}`}
-              loading="eager"
-              sx={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                transition: 'transform 0.4s ease',
-                bgcolor: '#000',
-                '&:hover': {
-                  transform: 'scale(1.02)',
-                },
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.5) 100%)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            {/* Top badges */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 14,
-                left: 14,
-                right: 14,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                pointerEvents: 'none',
-              }}
-            >
-              {currentTag ? (
-                <Chip
-                  label={currentTag}
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(15,23,42,0.85)',
-                    color: '#38bdf8',
-                    backdropFilter: 'blur(8px)',
-                    fontWeight: 600,
-                    fontSize: 11,
-                  }}
-                />
-              ) : <Box />}
-              <Chip
-                label={`${activeImageIndex + 1} / ${images.length}`}
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(0,0,0,0.75)',
-                  color: '#ffffff',
-                  backdropFilter: 'blur(8px)',
-                  fontWeight: 600,
-                  fontSize: 11,
-                }}
-              />
-            </Box>
-
-            {/* Fullscreen button */}
-            <Tooltip title="View Fullscreen" arrow>
-              <IconButton
-                onClick={(e) => { e.stopPropagation(); onOpenLightbox(currentImage); }}
-                size="small"
-                sx={{
-                  position: 'absolute',
-                  bottom: 14,
-                  right: 14,
-                  bgcolor: 'rgba(15,23,42,0.8)',
-                  backdropFilter: 'blur(8px)',
-                  color: '#ffffff',
-                  '&:hover': { bgcolor: '#0284c7' },
-                }}
-              >
-                <FullscreenIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            {/* Prev / Next photo buttons */}
-            {images.length > 1 && (
-              <>
-                <IconButton
-                  onClick={handlePrevImage}
-                  sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: 12,
-                    transform: 'translateY(-50%)',
-                    bgcolor: 'rgba(15,23,42,0.75)',
-                    backdropFilter: 'blur(8px)',
-                    color: '#ffffff',
-                    '&:hover': { bgcolor: '#0284c7' },
-                  }}
-                >
-                  <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-                <IconButton
-                  onClick={handleNextImage}
-                  sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    right: 12,
-                    transform: 'translateY(-50%)',
-                    bgcolor: 'rgba(15,23,42,0.75)',
-                    backdropFilter: 'blur(8px)',
-                    color: '#ffffff',
-                    '&:hover': { bgcolor: '#0284c7' },
-                  }}
-                >
-                  <ArrowForwardIosIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </>
-            )}
-          </Box>
-        ) : (
-          <Box
-            sx={{
+              minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              p: 6,
-              color: 'text.secondary',
+              gap: 1.5,
             }}
           >
-            <PhotoCameraIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
-            <Typography variant="body2">No photos recorded for this spot</Typography>
+            {leftStack.map(({ assetId, index }) => (
+              <StackPhotoItem
+                key={`${assetId}-${index}`}
+                assetId={assetId}
+                index={index}
+                spotName={spot.name}
+                onOpenLightbox={onOpenLightbox}
+              />
+            ))}
           </Box>
-        )}
 
-        {/* Thumbnail Filmstrip */}
-        {images.length > 1 && (
-          <Box sx={{ height: 72, minHeight: 72 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 1,
-                height: '100%',
-                overflowX: 'auto',
-                pb: 0.5,
-                '&::-webkit-scrollbar': { height: 4 },
-                '&::-webkit-scrollbar-thumb': {
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  borderRadius: 2,
-                },
-              }}
-            >
-              {images.map((img, idx) => (
-                <Box
-                  component="button"
-                  key={img}
-                  onClick={() => setActiveImageIndex(idx)}
-                  sx={{
-                    height: '100%',
-                    aspectRatio: '4/3',
-                    borderRadius: 1.5,
-                    overflow: 'hidden',
-                    p: 0,
-                    border: '2px solid',
-                    borderColor: idx === activeImageIndex ? '#06b6d4' : 'transparent',
-                    boxShadow: idx === activeImageIndex ? '0 0 12px rgba(6, 182, 212, 0.5)' : 'none',
-                    bgcolor: '#000',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    opacity: idx === activeImageIndex ? 1 : 0.6,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      opacity: 0.9,
-                      transform: 'translateY(-2px)',
-                    },
-                  }}
-                >
-                  <Box
-                    component="img"
-                    src={img}
-                    alt={`Thumbnail ${idx + 1}`}
-                    loading="lazy"
-                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
-                </Box>
-              ))}
-            </Box>
+          {/* Column 2 Stack */}
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1.5,
+            }}
+          >
+            {rightStack.map(({ assetId, index }) => (
+              <StackPhotoItem
+                key={`${assetId}-${index}`}
+                assetId={assetId}
+                index={index}
+                spotName={spot.name}
+                onOpenLightbox={onOpenLightbox}
+              />
+            ))}
           </Box>
-        )}
-      </Box>
+        </Box>
+      )}
     </Box>
   );
 };

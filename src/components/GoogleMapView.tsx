@@ -18,6 +18,27 @@ interface GoogleMapViewProps {
 
 const DEFAULT_DAY_COLORS = ['#f59e0b', '#06b6d4', '#10b981', '#ec4899', '#8b5cf6'];
 
+function getMapBoundsPadding(
+  mapDiv: HTMLElement | null,
+  viewMode: ViewMode
+): google.maps.Padding {
+  const w = mapDiv?.clientWidth || window.innerWidth;
+  const h = mapDiv?.clientHeight || window.innerHeight;
+
+  if (viewMode === 'trip-overview' || viewMode === 'day-overview') {
+    if (window.innerWidth >= 900) {
+      const panelWidth = viewMode === 'trip-overview' ? 400 : 390;
+      const panelRightEdge = 20 + panelWidth;
+      const left = Math.min(panelRightEdge + 56, Math.floor(w * 0.56));
+      return { top: 56, right: 56, bottom: 56, left };
+    }
+    const bottom = Math.min(Math.floor(h * 0.45) + 32, Math.floor(h * 0.58));
+    return { top: 36, right: 36, bottom, left: 36 };
+  }
+
+  return { top: 64, right: 64, bottom: 64, left: 64 };
+}
+
 const GoogleMapRouteController: React.FC<{
   viewMode: ViewMode;
   allDays: ItineraryDay[];
@@ -33,6 +54,7 @@ const GoogleMapRouteController: React.FC<{
     const currentDay = allDays[currentDayIndex] || allDays[0];
     const currentSpots = currentDay?.spots || [];
     const currentSpot = currentSpots[currentSpotIndex];
+    let activeBounds: google.maps.LatLngBounds | null = null;
 
     if (viewMode === 'trip-overview') {
       const bounds = new google.maps.LatLngBounds();
@@ -54,12 +76,11 @@ const GoogleMapRouteController: React.FC<{
             map,
           });
           polylines.push(line);
-        } else {
-          day.spots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
         }
+        day.spots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
       });
 
-      map.fitBounds(bounds, 60);
+      activeBounds = bounds;
     } else if (viewMode === 'day-overview') {
       const bounds = new google.maps.LatLngBounds();
       const color = currentDay.color || DEFAULT_DAY_COLORS[currentDayIndex % DEFAULT_DAY_COLORS.length];
@@ -79,11 +100,10 @@ const GoogleMapRouteController: React.FC<{
           map,
         });
         polylines.push(line);
-      } else {
-        currentSpots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
       }
+      currentSpots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
 
-      map.fitBounds(bounds, 70);
+      activeBounds = bounds;
     } else if (viewMode === 'spot-detail' && currentSpot) {
       // Background day route
       if (currentDay.driving_route && currentDay.driving_route.length > 1) {
@@ -115,14 +135,43 @@ const GoogleMapRouteController: React.FC<{
 
         const bounds = new google.maps.LatLngBounds();
         segPts.forEach(pt => bounds.extend(pt));
-        map.fitBounds(bounds, 70);
-      } else {
-        map.panTo({ lat: currentSpot.lat, lng: currentSpot.lng });
-        map.setZoom(13);
+        bounds.extend({ lat: currentSpot.lat, lng: currentSpot.lng });
+        activeBounds = bounds;
       }
     }
 
+    const mapDiv = map.getDiv();
+    const applyCamera = () => {
+      if (activeBounds && !activeBounds.isEmpty()) {
+        map.fitBounds(activeBounds, getMapBoundsPadding(mapDiv, viewMode));
+      } else if (viewMode === 'spot-detail' && currentSpot) {
+        map.panTo({ lat: currentSpot.lat, lng: currentSpot.lng });
+        map.setZoom(13);
+      }
+    };
+
+    applyCamera();
+
+    let lastW = mapDiv?.clientWidth || 0;
+    let lastH = mapDiv?.clientHeight || 0;
+    const resizeObserver = mapDiv
+      ? new ResizeObserver(() => {
+          const nw = mapDiv.clientWidth;
+          const nh = mapDiv.clientHeight;
+          if (Math.abs(nw - lastW) > 4 || Math.abs(nh - lastH) > 4) {
+            lastW = nw;
+            lastH = nh;
+            applyCamera();
+          }
+        })
+      : null;
+
+    if (resizeObserver && mapDiv) {
+      resizeObserver.observe(mapDiv);
+    }
+
     return () => {
+      resizeObserver?.disconnect();
       polylines.forEach(p => p.setMap(null));
     };
   }, [map, viewMode, allDays, currentDayIndex, currentSpotIndex]);
@@ -240,6 +289,9 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           mapId="DEMO_MAP_ID"
           gestureHandling="greedy"
           disableDefaultUI={false}
+          mapTypeControl={false}
+          streetViewControl={false}
+          fullscreenControl={false}
           style={{ width: '100%', height: '100%' }}
         >
           <GoogleMapRouteController
@@ -251,21 +303,64 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
 
           {viewMode === 'trip-overview' ? (
             allDays.map((day, dIdx) =>
-              day.spots.map((spot, sIdx) => (
-                <AdvancedMarker
-                  key={`${dIdx}-${sIdx}`}
-                  position={{ lat: spot.lat, lng: spot.lng }}
-                  onClick={() => onSelectSpot(dIdx, sIdx)}
-                >
-                  <Pin
-                    background={day.color || '#38bdf8'}
-                    borderColor="#ffffff"
-                    glyphColor="#000000"
-                    glyph={`D${dIdx + 1}.${sIdx + 1}`}
-                    scale={1.0}
-                  />
-                </AdvancedMarker>
-              ))
+              day.spots.map((spot, sIdx) => {
+                const isDayStart = sIdx === 0;
+                const dayColor = day.color || '#38bdf8';
+                return (
+                  <AdvancedMarker
+                    key={`${dIdx}-${sIdx}`}
+                    position={{ lat: spot.lat, lng: spot.lng }}
+                    onClick={() => onSelectSpot(dIdx, sIdx)}
+                    title={`Day ${dIdx + 1}: ${spot.name}`}
+                  >
+                    {isDayStart ? (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'rgba(15, 23, 42, 0.92)',
+                          border: `2px solid ${dayColor}`,
+                          borderRadius: '12px',
+                          padding: '2px 7px',
+                          color: '#ffffff',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                          cursor: 'pointer',
+                          transform: 'translateY(-50%)',
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            backgroundColor: dayColor,
+                            boxShadow: `0 0 6px ${dayColor}`,
+                          }}
+                        />
+                        D{dIdx + 1}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          backgroundColor: dayColor,
+                          border: '1.5px solid #ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                          cursor: 'pointer',
+                          transform: 'translate(-50%, -50%)',
+                        }}
+                      />
+                    )}
+                  </AdvancedMarker>
+                );
+              })
             )
           ) : (
             currentSpots.map((spot, idx) => {

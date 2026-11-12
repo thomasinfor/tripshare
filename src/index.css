@@ -134,23 +134,24 @@ html, body, #root {
 /* ==========================================================================
    Timeline Scrubber (Custom Track Styling)
    ========================================================================== */
-.timeline-base-line {
+.timeline-track-rail {
   position: absolute;
-  left: 20px;
-  right: 20px;
+  left: 11px;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
   height: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
+  pointer-events: none;
 }
 
-.timeline-progress-line {
-  position: absolute;
-  left: 20px;
-  height: 3px;
+.timeline-progress-fill {
+  height: 100%;
   background: linear-gradient(90deg, #0ea5e9, #06b6d4);
   border-radius: 9999px;
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
-  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.7);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .timeline-nodes-container {

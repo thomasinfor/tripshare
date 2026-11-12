@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
+import { getMediaUrl } from '../utils/media';
 
 interface LightboxModalProps {
   images: string[];
@@ -28,15 +29,22 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
   onSelectImage,
 }) => {
   const currentIndex = images.indexOf(currentImage);
+  const [isFullLoaded, setIsFullLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsFullLoaded(false);
+  }, [currentImage]);
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    setIsFullLoaded(false);
     const prevIdx = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
     onSelectImage(images[prevIdx]);
   };
 
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    setIsFullLoaded(false);
     const nextIdx = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
     onSelectImage(images[nextIdx]);
   };
@@ -51,7 +59,9 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, images, onClose, onSelectImage]);
 
-  const filename = currentImage.split('/').pop() || '';
+  const thumbUrl = getMediaUrl(currentImage, 'thumbnail');
+  const previewUrl = getMediaUrl(currentImage, 'preview');
+  const originalUrl = getMediaUrl(currentImage, 'original');
 
   return (
     <Dialog
@@ -62,18 +72,21 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
       slotProps={{
         paper: {
           sx: {
-            bgcolor: 'rgba(9, 13, 22, 0.96)',
-            backdropFilter: 'blur(24px)',
+            bgcolor: 'rgba(5, 8, 15, 0.96)',
+            backdropFilter: 'blur(20px)',
             borderRadius: 3,
-            border: '1px solid rgba(255, 255, 255, 0.1)',
             overflow: 'hidden',
-            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.9)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8)',
+            height: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
           },
         },
       }}
     >
-      <DialogContent sx={{ p: 0, position: 'relative', display: 'flex', flexDirection: 'column', height: '85vh' }}>
-        {/* Top Header Bar */}
+      <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Top Bar */}
         <Box
           sx={{
             display: 'flex',
@@ -86,7 +99,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 700 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#fff' }}>
               {spotName}
             </Typography>
             <Typography variant="caption" sx={{ color: '#38bdf8', bgcolor: 'rgba(56, 189, 248, 0.12)', px: 1, py: 0.3, borderRadius: 1, fontWeight: 700 }}>
@@ -98,8 +111,9 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             <Tooltip title="Download original photo">
               <IconButton
                 component="a"
-                href={currentImage}
-                download={filename}
+                href={originalUrl}
+                download={`${currentImage}.jpg`}
+                target="_blank"
                 size="small"
                 sx={{ color: 'text.secondary', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}
               >
@@ -147,15 +161,39 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             </IconButton>
           )}
 
+          {/* Instant blurred thumbnail */}
           <Box
             component="img"
-            src={currentImage}
-            alt={`${spotName} fullscreen`}
+            key={`lb-thumb-${currentImage}`}
+            src={thumbUrl}
+            alt=""
             sx={{
+              position: 'absolute',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              filter: isFullLoaded ? 'none' : 'blur(16px)',
+              opacity: isFullLoaded ? 0 : 0.9,
+              transition: 'opacity 0.35s ease',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* High-res photo */}
+          <Box
+            component="img"
+            key={`lb-preview-${currentImage}`}
+            src={previewUrl}
+            alt={`${spotName} fullscreen`}
+            onLoad={() => setIsFullLoaded(true)}
+            sx={{
+              position: 'relative',
               maxWidth: '100%',
               maxHeight: '100%',
               objectFit: 'contain',
               userSelect: 'none',
+              opacity: isFullLoaded ? 1 : 0.3,
+              transition: 'opacity 0.3s ease',
             }}
           />
 
@@ -190,7 +228,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           }}
         >
           <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
-            {filename}
+            Asset ID: {currentImage}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Use ← and → arrows to browse photos

@@ -1,22 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Spot, ItineraryDay, ViewMode } from '../types';
+import { getMediaUrl } from '../utils/media';
 import {
   Box,
   Stack,
   Typography,
   Button,
-  IconButton,
   Chip,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import MapIcon from '@mui/icons-material/Map';
 import PublicIcon from '@mui/icons-material/Public';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 
 interface BottomNavigationProps {
   days: ItineraryDay[];
@@ -30,6 +29,9 @@ interface BottomNavigationProps {
   onPrev: () => void;
   onNext: () => void;
 }
+
+const TOUR_SLIDE_DURATION_MS = 5000;
+const TICK_MS = 100;
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   days,
@@ -50,156 +52,247 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   // Tooltip hover state
   const [hoveredSpotIdx, setHoveredSpotIdx] = useState<number | null>(null);
 
-  // Auto-play slideshow tour
+  // Auto-play slideshow tour with visual countdown
   const [isPlaying, setIsPlaying] = useState(false);
-  const playTimerRef = React.useRef<number | null>(null);
+  const [remainingMs, setRemainingMs] = useState(TOUR_SLIDE_DURATION_MS);
+  const onNextRef = useRef(onNext);
+  onNextRef.current = onNext;
+  const activeDayChipRef = useRef<HTMLDivElement | null>(null);
 
-  React.useEffect(() => {
-    if (isPlaying) {
-      playTimerRef.current = window.setInterval(() => {
-        onNext();
-      }, 4500);
-    } else if (playTimerRef.current) {
-      clearInterval(playTimerRef.current);
+  // Ensure active day chip is visible on narrow viewports
+  useEffect(() => {
+    if (viewMode !== 'trip-overview' && activeDayChipRef.current) {
+      activeDayChipRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'nearest',
+        block: 'nearest',
+      });
     }
-    return () => {
-      if (playTimerRef.current) clearInterval(playTimerRef.current);
-    };
-  }, [isPlaying, onNext]);
+  }, [currentDayIndex, viewMode]);
+
+  // Reset countdown whenever slide position or mode changes
+  useEffect(() => {
+    setRemainingMs(TOUR_SLIDE_DURATION_MS);
+  }, [currentDayIndex, currentSpotIndex, viewMode]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      setRemainingMs(TOUR_SLIDE_DURATION_MS);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setRemainingMs((prev) => {
+        if (prev <= TICK_MS) {
+          onNextRef.current();
+          return TOUR_SLIDE_DURATION_MS;
+        }
+        return prev - TICK_MS;
+      });
+    }, TICK_MS);
+
+    return () => clearInterval(timer);
+  }, [isPlaying]);
+
+  // Tour countdown progress calculation
+  const tourProgressPercent = isPlaying
+    ? Math.min(100, Math.max(0, ((TOUR_SLIDE_DURATION_MS - remainingMs) / TOUR_SLIDE_DURATION_MS) * 100))
+    : 0;
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+
+  // Step calculations for timeline scrubber:
+  // Step 0: Day Route Map Overview (the Map icon)
+  // Steps 1..N: Spot 0 to Spot N-1
+  const maxStepIndex = spots.length; // e.g. 5 spots => 6 total nodes (0 to 5)
+  const currentStep =
+    viewMode === 'day-overview' || viewMode === 'trip-overview'
+      ? 0
+      : currentSpotIndex + 1;
+  const scrubberProgressPercent =
+    maxStepIndex > 0 ? Math.min(100, Math.max(0, (currentStep / maxStepIndex) * 100)) : 0;
 
   return (
     <Box
       component="footer"
       className="bottom-navigation-bar"
       sx={{
+        position: 'relative',
         height: 'var(--bottom-bar-height)',
-        bgcolor: 'rgba(15, 23, 42, 0.88)',
-        backdropFilter: 'blur(18px)',
+        bgcolor: 'rgba(15, 23, 42, 0.90)',
+        backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        px: { xs: 2, sm: 3 },
-        py: 1,
+        px: { xs: 1.5, sm: 2.5 },
+        py: 0.8,
         zIndex: 100,
       }}
     >
       {/* Top Controls Row: Day Tabs & Overview Buttons */}
       <Stack
         direction="row"
-        spacing={2}
+        spacing={1.5}
         sx={{ alignItems: 'center', justifyContent: 'space-between' }}
       >
-        {/* Day Tabs */}
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', overflowX: 'auto', minWidth: 0 }}>
+        {/* Day Tabs - active chip expanded, inactive chips compact so all fit */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            overflowX: 'auto',
+            minWidth: 0,
+            py: 0.2,
+            scrollbarWidth: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+          }}
+        >
           {/* Entire Trip Overview Button */}
-          <Chip
-            icon={<PublicIcon sx={{ fontSize: '15px !important' }} />}
-            label="Entire Trip Map"
-            size="small"
-            clickable
-            onClick={onOpenTripOverview}
-            variant={viewMode === 'trip-overview' ? 'filled' : 'outlined'}
-            sx={{
-              bgcolor: viewMode === 'trip-overview' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-              borderColor: viewMode === 'trip-overview' ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)',
-              color: viewMode === 'trip-overview' ? '#38bdf8' : 'text.secondary',
-              fontWeight: 700,
-              fontSize: '12px'
-            }}
-          />
+          <Tooltip title={`View Entire ${days.length}-Day Route Map`} arrow>
+            <Chip
+              icon={<PublicIcon sx={{ fontSize: '13px !important' }} />}
+              label="All Map"
+              size="small"
+              clickable
+              onClick={onOpenTripOverview}
+              variant={viewMode === 'trip-overview' ? 'filled' : 'outlined'}
+              sx={{
+                height: 24,
+                px: 0.5,
+                bgcolor: viewMode === 'trip-overview' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                borderColor: viewMode === 'trip-overview' ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)',
+                color: viewMode === 'trip-overview' ? '#38bdf8' : 'text.secondary',
+                fontWeight: 700,
+                fontSize: '11px',
+                flexShrink: 0,
+              }}
+            />
+          </Tooltip>
 
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: { xs: 'none', md: 'inline' } }}>
-            |
-          </Typography>
+          <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255, 255, 255, 0.12)', mx: 0.2, flexShrink: 0 }} />
 
           {/* Individual Day Tabs */}
           {days.map((day, idx) => {
             const isActive = viewMode !== 'trip-overview' && idx === currentDayIndex;
             const dayColor = day.color || '#38bdf8';
             return (
-              <Chip
+              <Tooltip
                 key={day.date || idx}
-                label={`Day ${idx + 1}: ${day.spots.length} spots`}
-                size="small"
-                clickable
-                onClick={() => onSelectDay(idx)}
-                variant={isActive ? 'filled' : 'outlined'}
-                avatar={
-                  <Box
-                    sx={{
-                      width: '8px !important',
-                      height: '8px !important',
-                      borderRadius: '50% !important',
-                      bgcolor: dayColor,
-                      boxShadow: `0 0 6px ${dayColor}`
-                    }}
-                  />
-                }
-                sx={{
-                  bgcolor: isActive ? `${dayColor}25` : 'rgba(255, 255, 255, 0.04)',
-                  borderColor: isActive ? dayColor : 'rgba(255, 255, 255, 0.1)',
-                  color: isActive ? '#ffffff' : 'text.secondary',
-                  fontWeight: isActive ? 700 : 500,
-                  fontSize: '12px',
-                  whiteSpace: 'nowrap'
-                }}
-              />
+                title={`Day ${idx + 1}: ${day.spots.length} spots • ${day.title || day.date}`}
+                arrow
+              >
+                <Chip
+                  ref={isActive ? activeDayChipRef : undefined}
+                  label={isActive ? `Day ${idx + 1}: ${day.spots.length} spots` : `D${idx + 1}`}
+                  size="small"
+                  clickable
+                  onClick={() => onSelectDay(idx)}
+                  variant={isActive ? 'filled' : 'outlined'}
+                  avatar={
+                    <Box
+                      sx={{
+                        width: isActive ? '8px !important' : '6px !important',
+                        height: isActive ? '8px !important' : '6px !important',
+                        borderRadius: '50% !important',
+                        bgcolor: dayColor,
+                        boxShadow: isActive ? `0 0 6px ${dayColor}` : 'none',
+                      }}
+                    />
+                  }
+                  sx={{
+                    height: 24,
+                    minWidth: isActive ? 'auto' : 38,
+                    px: isActive ? 0.6 : 0.2,
+                    bgcolor: isActive ? `${dayColor}28` : 'rgba(255, 255, 255, 0.04)',
+                    borderColor: isActive ? dayColor : 'rgba(255, 255, 255, 0.08)',
+                    color: isActive ? '#ffffff' : 'text.secondary',
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: '11px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: `${dayColor}20`,
+                      borderColor: dayColor,
+                      color: '#ffffff',
+                    },
+                  }}
+                />
+              </Tooltip>
             );
           })}
-        </Stack>
+        </Box>
 
-        {/* Action Controls: Day Route Toggle & Autoplay */}
+        {/* Action Controls: Day Route Toggle & Autoplay Tour */}
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
           <Button
             size="small"
             variant={viewMode === 'day-overview' ? 'contained' : 'outlined'}
             onClick={onToggleDayOverview}
-            startIcon={<MapIcon sx={{ fontSize: 15 }} />}
+            startIcon={<MapIcon sx={{ fontSize: 14 }} />}
             sx={{
-              fontSize: '12px',
-              py: 0.4,
-              px: 1.2,
+              fontSize: '11.5px',
+              py: 0.35,
+              px: 1,
               borderColor: 'rgba(255, 255, 255, 0.15)',
-              display: { xs: 'none', sm: 'inline-flex' }
+              display: { xs: 'none', sm: 'inline-flex' },
             }}
           >
             {viewMode === 'day-overview' ? 'Spot Detail' : 'Day Route'}
           </Button>
 
+          {/* Tour Button with circular countdown indicator */}
           <Button
             size="small"
             onClick={() => setIsPlaying(!isPlaying)}
-            startIcon={isPlaying ? <PauseIcon sx={{ fontSize: 15 }} /> : <PlayArrowIcon sx={{ fontSize: 15 }} />}
+            startIcon={
+              isPlaying ? (
+                <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CircularProgress
+                    variant="determinate"
+                    value={tourProgressPercent}
+                    size={16}
+                    thickness={6}
+                    sx={{ color: '#10b981' }}
+                  />
+                  <PauseIcon sx={{ position: 'absolute', fontSize: 10, color: '#34d399' }} />
+                </Box>
+              ) : (
+                <PlayArrowIcon sx={{ fontSize: 15 }} />
+              )
+            }
             sx={{
-              fontSize: '12px',
-              py: 0.4,
+              fontSize: '11.5px',
+              fontWeight: 600,
+              py: 0.35,
               px: 1.2,
-              bgcolor: isPlaying ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+              bgcolor: isPlaying ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.06)',
               color: isPlaying ? '#34d399' : 'text.secondary',
               border: isPlaying ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.2s',
             }}
           >
-            {isPlaying ? 'Pause' : 'Tour'}
+            {isPlaying ? `Pause (${remainingSeconds}s)` : 'Tour'}
           </Button>
         </Stack>
       </Stack>
 
       {/* Main Scrubber Row */}
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mt: 0.5 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 0.3 }}>
         {/* Previous Button */}
         <Button
           size="small"
           onClick={onPrev}
-          startIcon={<ArrowBackIcon sx={{ fontSize: 17 }} />}
+          startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
           sx={{
-            minWidth: { xs: 36, sm: 80 },
-            px: { xs: 1, sm: 2 },
-            py: 0.8,
+            minWidth: { xs: 34, sm: 76 },
+            px: { xs: 0.8, sm: 1.5 },
+            py: 0.6,
             bgcolor: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#ffffff',
-            fontSize: '12.5px'
+            fontSize: '12px',
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
@@ -212,30 +305,24 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         </Button>
 
         {/* Timeline Slider Track */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Box className="timeline-track-container" sx={{ position: 'relative', height: 30, display: 'flex', alignItems: 'center' }}>
-            {/* Background line */}
-            <Box className="timeline-base-line" />
-
-            {/* Filled progress line */}
-            <Box
-              className="timeline-progress-line"
-              sx={{
-                width:
-                  viewMode !== 'spot-detail'
-                    ? '0%'
-                    : spots.length > 1
-                    ? `${(currentSpotIndex / (spots.length - 1)) * 100}%`
-                    : '100%',
-              }}
-            />
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.3, minWidth: 0 }}>
+          <Box className="timeline-track-container" sx={{ position: 'relative', height: 28, display: 'flex', alignItems: 'center' }}>
+            {/* Base Rail and Active Progress Fill - exactly aligned to dot centers (11px left and right) */}
+            <Box className="timeline-track-rail">
+              <Box
+                className="timeline-progress-fill"
+                sx={{
+                  width: `${scrubberProgressPercent}%`,
+                }}
+              />
+            </Box>
 
             {/* Stepped Spot Nodes */}
             <Box className="timeline-nodes-container">
               {/* Day Route Map Node */}
               <Tooltip title="Day Route Map Overview" arrow>
                 <Box
-                  className={`timeline-node overview-node ${viewMode === 'day-overview' ? 'active' : ''}`}
+                  className={`timeline-node overview-node ${currentStep === 0 ? 'active' : 'passed'}`}
                   onClick={onToggleDayOverview}
                 >
                   <Box className="node-dot">
@@ -246,8 +333,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
               {/* Spot Nodes */}
               {spots.map((spot, idx) => {
-                const isActive = viewMode === 'spot-detail' && idx === currentSpotIndex;
-                const isPassed = viewMode === 'spot-detail' && idx < currentSpotIndex;
+                const stepNum = idx + 1;
+                const isActive = viewMode === 'spot-detail' && currentStep === stepNum;
+                const isPassed = currentStep > stepNum;
                 const isHovered = hoveredSpotIdx === idx;
 
                 return (
@@ -288,7 +376,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                         {spot.images?.[0] && (
                           <Box
                             component="img"
-                            src={spot.images[0]}
+                            src={getMediaUrl(spot.images[0], 'thumbnail')}
                             alt={spot.name}
                             sx={{ width: 42, height: 42, borderRadius: 1, objectFit: 'cover', bgcolor: '#000' }}
                           />
@@ -310,17 +398,17 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </Box>
 
           {/* Status text */}
-          <Box sx={{ textAlign: 'center', fontSize: '12px', color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <Box sx={{ textAlign: 'center', fontSize: '11.5px', color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {viewMode === 'trip-overview' ? (
-              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600 }}>
-                🌍 Entire Expedition Route Map (All 3 Days Color Coded)
+              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '11.5px' }}>
+                🌍 Entire Expedition Route Map (All {days.length} Days Color Coded)
               </Typography>
             ) : viewMode === 'day-overview' ? (
-              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600 }}>
+              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '11.5px' }}>
                 📍 Full Day {currentDayIndex + 1} Route Overview ({spots.length} spots • {currentDay?.driving_distance_km || 0} km drive)
               </Typography>
             ) : currentSpot ? (
-              <Typography variant="caption">
+              <Typography variant="caption" sx={{ fontSize: '11.5px' }}>
                 <strong style={{ color: '#38bdf8' }}>Spot {currentSpotIndex + 1} of {spots.length}:</strong>{' '}
                 <span style={{ color: '#ffffff', fontWeight: 600 }}>{currentSpot.name}</span>
                 {currentSpot.driving_distance_km ? (
@@ -337,15 +425,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <Button
           size="small"
           onClick={onNext}
-          endIcon={<ArrowForwardIcon sx={{ fontSize: 17 }} />}
+          endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
           sx={{
-            minWidth: { xs: 36, sm: 80 },
-            px: { xs: 1, sm: 2 },
-            py: 0.8,
+            minWidth: { xs: 34, sm: 76 },
+            px: { xs: 0.8, sm: 1.5 },
+            py: 0.6,
             bgcolor: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#ffffff',
-            fontSize: '12.5px'
+            fontSize: '12px',
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>

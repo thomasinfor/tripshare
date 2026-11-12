@@ -109,8 +109,27 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
     if (!map || !markersGroup || !routeGroup || allDays.length === 0) return;
 
+    map.invalidateSize();
     markersGroup.clearLayers();
     routeGroup.clearLayers();
+
+    const getOverviewPadding = (mode: 'trip-overview' | 'day-overview') => {
+      const w = containerRef.current?.clientWidth || window.innerWidth;
+      const h = containerRef.current?.clientHeight || window.innerHeight;
+      if (window.innerWidth >= 900) {
+        const panelWidth = mode === 'trip-overview' ? 400 : 390;
+        const left = Math.min(20 + panelWidth + 56, Math.floor(w * 0.56));
+        return {
+          paddingTopLeft: [left, 56] as [number, number],
+          paddingBottomRight: [56, 56] as [number, number],
+        };
+      }
+      const bottom = Math.min(Math.floor(h * 0.45) + 32, Math.floor(h * 0.58));
+      return {
+        paddingTopLeft: [36, 36] as [number, number],
+        paddingBottomRight: [36, bottom] as [number, number],
+      };
+    };
 
     const currentDay = allDays[currentDayIndex] || allDays[0];
     const currentSpots = currentDay?.spots || [];
@@ -131,6 +150,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           : null;
 
         if (drivingPts) {
+          drivingPts.forEach(pt => allCoordsForBounds.push(pt));
           // Glow layer
           L.polyline(drivingPts, {
             color: dayColor,
@@ -153,21 +173,24 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         // Add markers for all spots of this day
         day.spots.forEach((spot, sIdx) => {
           allCoordsForBounds.push([spot.lat, spot.lng]);
+          const isDayStart = sIdx === 0;
 
-          const markerHtml = `
-            <div class="custom-map-marker is-trip-overview" style="--day-color: ${dayColor}">
-              <div class="marker-badge" style="background: ${dayColor}; border-color: #ffffff; color: #000000;">
-                <span class="marker-num">D${dIdx + 1}.${sIdx + 1}</span>
-              </div>
-              <div class="marker-label">${spot.name}</div>
+          const markerHtml = isDayStart
+            ? `
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(15, 23, 42, 0.92); border: 2px solid ${dayColor}; border-radius: 12px; padding: 2px 7px; color: #ffffff; font-size: 11px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; white-space: nowrap;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: ${dayColor}; box-shadow: 0 0 6px ${dayColor};"></span>
+              D${dIdx + 1}
             </div>
+          `
+            : `
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${dayColor}; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer;"></div>
           `;
 
           const customIcon = L.divIcon({
             className: 'custom-leaflet-marker-wrap',
             html: markerHtml,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            iconSize: isDayStart ? [44, 22] : [10, 10],
+            iconAnchor: isDayStart ? [22, 11] : [5, 5],
           });
 
           const marker = L.marker([spot.lat, spot.lng], { icon: customIcon });
@@ -197,7 +220,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       if (allCoordsForBounds.length > 0) {
         const bounds = L.latLngBounds(allCoordsForBounds);
         map.flyToBounds(bounds, {
-          padding: [70, 70],
+          ...getOverviewPadding('trip-overview'),
           maxZoom: 13,
           duration: 1.2
         });
@@ -274,10 +297,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         marker.addTo(markersGroup);
       });
 
-      if (currentSpots.length > 0) {
-        const bounds = L.latLngBounds(currentSpots.map(s => [s.lat, s.lng]));
+      const dayBoundsCoords: [number, number][] = currentSpots.map(s => [s.lat, s.lng]);
+      if (drivingPts) {
+        drivingPts.forEach(pt => dayBoundsCoords.push(pt));
+      }
+
+      if (dayBoundsCoords.length > 0) {
+        const bounds = L.latLngBounds(dayBoundsCoords);
         map.flyToBounds(bounds, {
-          padding: [70, 70],
+          ...getOverviewPadding('day-overview'),
           maxZoom: 14,
           duration: 1.1
         });

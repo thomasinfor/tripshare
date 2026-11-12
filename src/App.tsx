@@ -13,6 +13,45 @@ import { BottomNavigation } from './components/BottomNavigation';
 import { LightboxModal } from './components/LightboxModal';
 import { MapConfigModal } from './components/MapConfigModal';
 
+const DEFAULT_GOOGLE_MAPS_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBUIiyAlQcrDC8hK9ho_Oep3u81_bSvSQ8';
+
+function parseUrlNavigationState(trip: NormalizedTrip): {
+  viewMode: ViewMode;
+  dayIndex: number;
+  spotIndex: number;
+} {
+  if (typeof window === 'undefined' || trip.days.length === 0) {
+    return { viewMode: 'trip-overview', dayIndex: 0, spotIndex: 0 };
+  }
+
+  // Prefer query parameters (?day=2&spot=4); also accept legacy hash (#day=2&spot=4)
+  const rawQuery =
+    window.location.search ||
+    (window.location.hash.includes('day=') ? window.location.hash.slice(1) : '');
+  const params = new URLSearchParams(rawQuery);
+  const dayParam = params.get('day');
+
+  if (dayParam !== null) {
+    const parsedDay = parseInt(dayParam, 10);
+    if (!Number.isNaN(parsedDay)) {
+      const dayIndex = Math.max(0, Math.min(trip.days.length - 1, parsedDay - 1));
+      const spotParam = params.get('spot');
+      if (spotParam !== null) {
+        const parsedSpot = parseInt(spotParam, 10);
+        if (!Number.isNaN(parsedSpot)) {
+          const maxSpot = Math.max(0, (trip.days[dayIndex]?.spots.length || 1) - 1);
+          const spotIndex = Math.max(0, Math.min(maxSpot, parsedSpot - 1));
+          return { viewMode: 'spot-detail', dayIndex, spotIndex };
+        }
+      }
+      return { viewMode: 'day-overview', dayIndex, spotIndex: 0 };
+    }
+  }
+
+  return { viewMode: 'trip-overview', dayIndex: 0, spotIndex: 0 };
+}
+
 export const App: React.FC = () => {
   // Normalize trip data
   const trip: NormalizedTrip = useMemo(() => {
@@ -20,10 +59,45 @@ export const App: React.FC = () => {
     return normalizeTrip(raw as TripRaw);
   }, []);
 
-  // State — start with 'trip-overview' as first page
-  const [viewMode, setViewMode] = useState<ViewMode>('trip-overview');
-  const [currentDayIndex, setCurrentDayIndex] = useState(0);
-  const [currentSpotIndex, setCurrentSpotIndex] = useState(0);
+  // Initialize state from URL query parameters (?day=X&spot=Y), defaulting to 'trip-overview'
+  const initialNav = useMemo(() => parseUrlNavigationState(trip), [trip]);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialNav.viewMode);
+  const [currentDayIndex, setCurrentDayIndex] = useState(initialNav.dayIndex);
+  const [currentSpotIndex, setCurrentSpotIndex] = useState(initialNav.spotIndex);
+
+  // Sync navigation state -> URL query parameters (?day=X&spot=Y)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('day');
+    params.delete('spot');
+
+    if (viewMode === 'day-overview') {
+      params.set('day', String(currentDayIndex + 1));
+    } else if (viewMode === 'spot-detail') {
+      params.set('day', String(currentDayIndex + 1));
+      params.set('spot', String(currentSpotIndex + 1));
+    }
+
+    const queryStr = params.toString();
+    const nextUrl = `${window.location.pathname}${queryStr ? `?${queryStr}` : ''}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState(null, '', nextUrl);
+    }
+  }, [viewMode, currentDayIndex, currentSpotIndex]);
+
+  // Sync browser Back/Forward (popstate) -> React state
+  useEffect(() => {
+    const handlePopState = () => {
+      const next = parseUrlNavigationState(trip);
+      setViewMode(next.viewMode);
+      setCurrentDayIndex(next.dayIndex);
+      setCurrentSpotIndex(next.spotIndex);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [trip]);
 
   // Lightbox
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -31,7 +105,7 @@ export const App: React.FC = () => {
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mapProvider, setMapProvider] = useState<MapProvider>(() => {
-    return (localStorage.getItem('tripshare_provider') as MapProvider) || 'leaflet';
+    return (localStorage.getItem('tripshare_provider') as MapProvider) || 'google';
   });
   const [mapStyle, setMapStyle] = useState<MapStyle>(() => {
     return (localStorage.getItem('tripshare_style') as MapStyle) || 'dark';
@@ -39,8 +113,7 @@ export const App: React.FC = () => {
   const [googleApiKey, setGoogleApiKey] = useState<string>(() => {
     return (
       localStorage.getItem('tripshare_google_key') ||
-      import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-      ''
+      DEFAULT_GOOGLE_MAPS_KEY
     );
   });
 
@@ -219,10 +292,9 @@ export const App: React.FC = () => {
               borderBottom: { xs: '1px solid rgba(255, 255, 255, 0.08)', md: 'none' },
               display: 'flex',
               flexDirection: 'column',
-              overflowY: 'auto',
+              overflow: 'hidden',
               position: 'relative',
               zIndex: 10,
-              transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             <SpotShowcase
@@ -245,7 +317,6 @@ export const App: React.FC = () => {
             height: isSplitView ? { xs: '50%', md: '100%' } : '100%',
             position: 'relative',
             overflow: 'hidden',
-            transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
           {mapProvider === 'google' ? (
