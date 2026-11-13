@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box } from '@mui/material';
 import rawTripData from './data/trips.json';
+import { TripCatalog } from './components/TripCatalog';
 import { TripRaw, NormalizedTrip, MapProvider, MapStyle, ViewMode } from './types';
-import { normalizeTrip } from './utils/geo';
+import { normalizeTrips } from './utils/geo';
 import { getMediaUrl, scheduleMediaPrefetch } from './utils/media';
 import { Header } from './components/Header';
 import { LeafletMap } from './components/LeafletMap';
@@ -16,6 +17,16 @@ import { MapConfigModal } from './components/MapConfigModal';
 
 const DEFAULT_GOOGLE_MAPS_KEY =
   import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBUIiyAlQcrDC8hK9ho_Oep3u81_bSvSQ8';
+
+const extraTripModules = import.meta.glob('./data/trips/*.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, TripRaw | TripRaw[]>;
+
+const ALL_TRIPS: NormalizedTrip[] = normalizeTrips([
+  rawTripData as unknown as TripRaw | TripRaw[],
+  ...Object.values(extraTripModules),
+]);
 
 function parseUrlNavigationState(trip: NormalizedTrip): {
   viewMode: ViewMode;
@@ -53,20 +64,51 @@ function parseUrlNavigationState(trip: NormalizedTrip): {
   return { viewMode: 'trip-overview', dayIndex: 0, spotIndex: 0 };
 }
 
-export const App: React.FC = () => {
-  // Normalize trip data
-  const trip: NormalizedTrip = useMemo(() => {
-    const raw = Array.isArray(rawTripData) ? rawTripData[0] : (rawTripData as TripRaw);
-    return normalizeTrip(raw as TripRaw);
-  }, []);
+function parseAppLocation(trips: NormalizedTrip[]): {
+  activeTripSlug: string | null;
+  unknownSlug: string | null;
+} {
+  if (typeof window === 'undefined') {
+    return { activeTripSlug: null, unknownSlug: null };
+  }
 
+  const trimmedPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  if (!trimmedPath || trimmedPath === 'index.html') {
+    const rawQuery =
+      window.location.search ||
+      (window.location.hash.includes('day=') ? window.location.hash.slice(1) : '');
+    const params = new URLSearchParams(rawQuery);
+    if (params.has('day') && trips.length > 0) {
+      return { activeTripSlug: trips[0].slug, unknownSlug: null };
+    }
+    return { activeTripSlug: null, unknownSlug: null };
+  }
+
+  const candidateSlug = decodeURIComponent(trimmedPath.split('/')[0]).toLowerCase();
+  const matched = trips.find((t) => t.slug === candidateSlug);
+  if (matched) {
+    return { activeTripSlug: matched.slug, unknownSlug: null };
+  }
+  return { activeTripSlug: null, unknownSlug: candidateSlug };
+}
+
+interface TripViewerProps {
+  trip: NormalizedTrip;
+  onBackToCatalog: () => void;
+}
+
+const TripViewer: React.FC<TripViewerProps> = ({ trip, onBackToCatalog }) => {
   // Initialize state from URL query parameters (?day=X&spot=Y), defaulting to 'trip-overview'
   const initialNav = useMemo(() => parseUrlNavigationState(trip), [trip]);
   const [viewMode, setViewMode] = useState<ViewMode>(initialNav.viewMode);
   const [currentDayIndex, setCurrentDayIndex] = useState(initialNav.dayIndex);
   const [currentSpotIndex, setCurrentSpotIndex] = useState(initialNav.spotIndex);
 
-  // Sync navigation state -> URL query parameters (?day=X&spot=Y)
+  useEffect(() => {
+    document.title = `${trip.title} — TripShare`;
+  }, [trip.title]);
+
+  // Sync navigation state -> URL query parameters (/slug?day=X&spot=Y)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     params.delete('day');
@@ -80,13 +122,14 @@ export const App: React.FC = () => {
     }
 
     const queryStr = params.toString();
-    const nextUrl = `${window.location.pathname}${queryStr ? `?${queryStr}` : ''}`;
+    const basePath = `/${trip.slug}`;
+    const nextUrl = `${basePath}${queryStr ? `?${queryStr}` : ''}`;
     const currentUrl = `${window.location.pathname}${window.location.search}`;
 
     if (nextUrl !== currentUrl) {
       window.history.replaceState(null, '', nextUrl);
     }
-  }, [viewMode, currentDayIndex, currentSpotIndex]);
+  }, [trip.slug, viewMode, currentDayIndex, currentSpotIndex]);
 
   // Sync browser Back/Forward (popstate) -> React state
   useEffect(() => {
@@ -311,6 +354,7 @@ export const App: React.FC = () => {
         viewMode={viewMode}
         mapProvider={mapProvider}
         mapStyle={mapStyle}
+        onBackToCatalog={onBackToCatalog}
         onOpenTripOverview={handleOpenTripOverview}
         onToggleDayOverview={handleToggleDayOverview}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -456,6 +500,80 @@ export const App: React.FC = () => {
         />
       )}
     </Box>
+  );
+};
+
+export const App: React.FC = () => {
+  const initialLocation = useMemo(() => parseAppLocation(ALL_TRIPS), []);
+  const [activeTripSlug, setActiveTripSlug] = useState<string | null>(
+    initialLocation.activeTripSlug
+  );
+  const [unknownSlug, setUnknownSlug] = useState<string | null>(initialLocation.unknownSlug);
+
+  const activeTrip = useMemo(
+    () => (activeTripSlug ? ALL_TRIPS.find((t) => t.slug === activeTripSlug) ?? null : null),
+    [activeTripSlug]
+  );
+
+  useEffect(() => {
+    if (!activeTrip) {
+      document.title = 'TripShare — Expedition Archive';
+    }
+  }, [activeTrip]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const next = parseAppLocation(ALL_TRIPS);
+      setActiveTripSlug(next.activeTripSlug);
+      setUnknownSlug(next.unknownSlug);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleSelectTrip = (slug: string) => {
+    const nextUrl = `/${slug}`;
+    if (window.location.pathname !== nextUrl || window.location.search) {
+      window.history.pushState(null, '', nextUrl);
+    }
+    setUnknownSlug(null);
+    setActiveTripSlug(slug);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const handleBackToCatalog = () => {
+    if (window.location.pathname !== '/' || window.location.search) {
+      window.history.pushState(null, '', '/');
+    }
+    setUnknownSlug(null);
+    setActiveTripSlug(null);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const handleDismissUnknownSlug = () => {
+    setUnknownSlug(null);
+    if (window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+    }
+  };
+
+  if (!activeTrip) {
+    return (
+      <TripCatalog
+        trips={ALL_TRIPS}
+        unknownSlug={unknownSlug}
+        onSelectTrip={handleSelectTrip}
+        onDismissUnknownSlug={handleDismissUnknownSlug}
+      />
+    );
+  }
+
+  return (
+    <TripViewer
+      key={activeTrip.slug}
+      trip={activeTrip}
+      onBackToCatalog={handleBackToCatalog}
+    />
   );
 };
 

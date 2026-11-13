@@ -41,6 +41,7 @@ export interface ItineraryDay {
 
 export interface TripRaw {
   trip: string;
+  slug?: string;
   title?: string;
   description?: string;
   cover_image?: string;
@@ -53,6 +54,7 @@ export interface TripRaw {
 
 export interface NormalizedTrip {
   trip: string;
+  slug: string;
   title: string;
   description: string;
   cover_image?: string;

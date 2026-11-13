@@ -265,6 +265,25 @@ export default defineConfig(({ mode }) => {
               );
               const parsed = JSON.parse(rawJson);
               const trips = Array.isArray(parsed) ? parsed : [parsed];
+
+              try {
+                const tripsDir = path.resolve(process.cwd(), 'src/data/trips');
+                const entries = await fs.readdir(tripsDir, { withFileTypes: true });
+                for (const entry of entries) {
+                  if (entry.isFile() && entry.name.endsWith('.json')) {
+                    const extraRaw = await fs.readFile(path.join(tripsDir, entry.name), 'utf8');
+                    const extraParsed = JSON.parse(extraRaw);
+                    if (Array.isArray(extraParsed)) {
+                      trips.push(...extraParsed);
+                    } else if (extraParsed && typeof extraParsed === 'object') {
+                      trips.push(extraParsed);
+                    }
+                  }
+                }
+              } catch {
+                // Optional src/data/trips directory may not exist
+              }
+
               const ids = new Set<string>();
               for (const t of trips) {
                 if (t?.cover_image && VALID_ID_RE.test(t.cover_image)) ids.add(t.cover_image);

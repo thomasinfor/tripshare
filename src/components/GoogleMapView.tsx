@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { Box, Typography, Button } from '@mui/material';
 import { ItineraryDay, MapStyle, ViewMode } from '../types';
+import { getDistinctDayColor } from '../utils/geo';
 import { KeyRound, Sparkles } from 'lucide-react';
 
 interface GoogleMapViewProps {
@@ -15,8 +16,6 @@ interface GoogleMapViewProps {
   onSwitchToLeaflet: () => void;
   onConfigureKey: () => void;
 }
-
-const DEFAULT_DAY_COLORS = ['#f59e0b', '#06b6d4', '#10b981', '#ec4899', '#8b5cf6'];
 
 function getMapBoundsPadding(
   mapDiv: HTMLElement | null,
@@ -60,13 +59,21 @@ const GoogleMapRouteController: React.FC<{
       const bounds = new google.maps.LatLngBounds();
 
       allDays.forEach((day, dIdx) => {
-        const color = day.color || DEFAULT_DAY_COLORS[dIdx % DEFAULT_DAY_COLORS.length];
+        const color = day.color || getDistinctDayColor(dIdx);
         const drivingPts = day.driving_route && day.driving_route.length > 1
           ? day.driving_route.map(p => ({ lat: p[0], lng: p[1] }))
           : null;
 
         if (drivingPts) {
           drivingPts.forEach(pt => bounds.extend(pt));
+          const casing = new google.maps.Polyline({
+            path: drivingPts,
+            geodesic: true,
+            strokeColor: '#ffffff',
+            strokeOpacity: 0.72,
+            strokeWeight: 6.5,
+            map,
+          });
           const line = new google.maps.Polyline({
             path: drivingPts,
             geodesic: true,
@@ -75,7 +82,7 @@ const GoogleMapRouteController: React.FC<{
             strokeWeight: 4,
             map,
           });
-          polylines.push(line);
+          polylines.push(casing, line);
         }
         day.spots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
       });
@@ -83,7 +90,7 @@ const GoogleMapRouteController: React.FC<{
       activeBounds = bounds;
     } else if (viewMode === 'day-overview') {
       const bounds = new google.maps.LatLngBounds();
-      const color = currentDay.color || DEFAULT_DAY_COLORS[currentDayIndex % DEFAULT_DAY_COLORS.length];
+      const color = currentDay.color || getDistinctDayColor(currentDayIndex);
 
       const drivingPts = currentDay.driving_route && currentDay.driving_route.length > 1
         ? currentDay.driving_route.map(p => ({ lat: p[0], lng: p[1] }))
@@ -321,7 +328,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             allDays.map((day, dIdx) =>
               day.spots.map((spot, sIdx) => {
                 const isDayStart = sIdx === 0;
-                const dayColor = day.color || '#b91c1c';
+                const dayColor = day.color || getDistinctDayColor(dIdx);
                 return (
                   <AdvancedMarker
                     key={`${dIdx}-${sIdx}`}

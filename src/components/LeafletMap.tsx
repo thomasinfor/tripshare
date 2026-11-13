@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { Spot, ItineraryDay, MapStyle, ViewMode } from '../types';
+import { getDistinctDayColor } from '../utils/geo';
 
 interface LeafletMapProps {
   viewMode: ViewMode;
@@ -29,8 +30,6 @@ const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string; maxZoom:
     maxZoom: 19,
   },
 };
-
-const DEFAULT_DAY_COLORS = ['#f59e0b', '#06b6d4', '#10b981', '#ec4899', '#8b5cf6'];
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
   viewMode,
@@ -142,7 +141,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       const allCoordsForBounds: [number, number][] = [];
 
       allDays.forEach((day, dIdx) => {
-        const dayColor = day.color || DEFAULT_DAY_COLORS[dIdx % DEFAULT_DAY_COLORS.length];
+        const dayColor = day.color || getDistinctDayColor(dIdx);
         
         // Draw real driving road route for this day (only when road coordinates exist, no straight lines)
         const drivingPts = day.driving_route && day.driving_route.length > 1 
@@ -154,8 +153,17 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           // Glow layer
           L.polyline(drivingPts, {
             color: dayColor,
-            weight: 7,
-            opacity: 0.35,
+            weight: 8,
+            opacity: 0.25,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(routeGroup);
+
+          // Crisp white casing for route separation
+          L.polyline(drivingPts, {
+            color: '#ffffff',
+            weight: 6.5,
+            opacity: 0.72,
             lineCap: 'round',
             lineJoin: 'round',
           }).addTo(routeGroup);
@@ -231,7 +239,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     // =========================================================================
     // 2. DAY OVERVIEW MODE: Render current day's driving route
     // =========================================================================
-    const dayColor = currentDay.color || DEFAULT_DAY_COLORS[currentDayIndex % DEFAULT_DAY_COLORS.length];
+    const dayColor = currentDay.color || getDistinctDayColor(currentDayIndex);
 
     if (viewMode === 'day-overview') {
       const drivingPts = currentDay.driving_route && currentDay.driving_route.length > 1
@@ -261,7 +269,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       currentSpots.forEach((spot, sIdx) => {
         const markerHtml = `
           <div class="custom-map-marker is-overview">
-            <div class="marker-badge" style="background: ${dayColor}; border-color: #ffffff; color: #000;">
+            <div class="marker-badge" style="background: #ffffff; border-color: ${dayColor}; color: #161615;">
               <span class="marker-num">${sIdx + 1}</span>
             </div>
             <div class="marker-label">${spot.name}</div>
