@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import rawTripData from './data/trips.json';
 import { TripRaw, NormalizedTrip, MapProvider, MapStyle, ViewMode } from './types';
 import { normalizeTrip } from './utils/geo';
+import { getMediaUrl, scheduleMediaPrefetch } from './utils/media';
 import { Header } from './components/Header';
 import { LeafletMap } from './components/LeafletMap';
 import { GoogleMapView } from './components/GoogleMapView';
@@ -120,6 +121,54 @@ export const App: React.FC = () => {
   const currentDay = trip.days[currentDayIndex] || trip.days[0];
   const spots = currentDay?.spots || [];
   const currentSpot = spots[currentSpotIndex];
+
+  // Idle-prefetch upcoming spot/day images so Next / Tour navigation feels instant
+  useEffect(() => {
+    const urlsToPrefetch: string[] = [];
+    const appendSpotMedia = (spotImages: string[] | undefined, includeHighRes: boolean) => {
+      if (!spotImages || spotImages.length === 0) return;
+      for (const id of spotImages.slice(0, 10)) {
+        urlsToPrefetch.push(getMediaUrl(id, 'thumbnail'));
+      }
+      if (includeHighRes) {
+        if (spotImages.length === 1) {
+          urlsToPrefetch.push(getMediaUrl(spotImages[0], 'preview'));
+        } else {
+          for (const id of spotImages.slice(0, 6)) {
+            urlsToPrefetch.push(getMediaUrl(id, 'grid'));
+          }
+        }
+      }
+    };
+
+    if (viewMode === 'trip-overview') {
+      const day0 = trip.days[0];
+      if (day0) {
+        for (const s of day0.spots) {
+          if (s.images?.[0]) urlsToPrefetch.push(getMediaUrl(s.images[0], 'thumbnail'));
+        }
+        appendSpotMedia(day0.spots[0]?.images, true);
+      }
+    } else if (viewMode === 'day-overview') {
+      appendSpotMedia(spots[0]?.images, true);
+      appendSpotMedia(spots[1]?.images, false);
+    } else if (viewMode === 'spot-detail') {
+      if (currentSpotIndex + 1 < spots.length) {
+        appendSpotMedia(spots[currentSpotIndex + 1]?.images, true);
+      } else if (currentDayIndex + 1 < trip.days.length) {
+        const nextDay = trip.days[currentDayIndex + 1];
+        for (const s of nextDay.spots) {
+          if (s.images?.[0]) urlsToPrefetch.push(getMediaUrl(s.images[0], 'thumbnail'));
+        }
+        appendSpotMedia(nextDay.spots[0]?.images, true);
+      }
+      if (currentSpotIndex > 0) {
+        appendSpotMedia(spots[currentSpotIndex - 1]?.images, false);
+      }
+    }
+
+    scheduleMediaPrefetch(urlsToPrefetch);
+  }, [viewMode, currentDayIndex, currentSpotIndex, spots, trip.days]);
 
   // Save Settings
   const handleSaveSettings = (config: {

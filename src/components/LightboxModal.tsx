@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
-import { getMediaUrl } from '../utils/media';
+import { getMediaUrl, scheduleMediaPrefetch, isMediaDecoded, markMediaDecoded } from '../utils/media';
 
 interface LightboxModalProps {
   images: string[];
@@ -29,24 +29,38 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
   onSelectImage,
 }) => {
   const currentIndex = images.indexOf(currentImage);
-  const [isFullLoaded, setIsFullLoaded] = useState(false);
+  const gridUrl = getMediaUrl(currentImage, 'grid');
+  const previewUrl = getMediaUrl(currentImage, 'preview');
+  const originalUrl = getMediaUrl(currentImage, 'original');
+
+  const initialFullReady = isMediaDecoded(previewUrl);
+  const instantRef = useRef(initialFullReady);
+  const [isFullLoaded, setIsFullLoaded] = useState(initialFullReady);
 
   useEffect(() => {
-    setIsFullLoaded(false);
-  }, [currentImage]);
+    const already = isMediaDecoded(previewUrl);
+    instantRef.current = already;
+    setIsFullLoaded(already);
+  }, [previewUrl]);
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setIsFullLoaded(false);
     const prevIdx = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
-    onSelectImage(images[prevIdx]);
+    const prevAsset = images[prevIdx];
+    const already = isMediaDecoded(getMediaUrl(prevAsset, 'preview'));
+    instantRef.current = already;
+    setIsFullLoaded(already);
+    onSelectImage(prevAsset);
   };
 
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setIsFullLoaded(false);
     const nextIdx = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
-    onSelectImage(images[nextIdx]);
+    const nextAsset = images[nextIdx];
+    const already = isMediaDecoded(getMediaUrl(nextAsset, 'preview'));
+    instantRef.current = already;
+    setIsFullLoaded(already);
+    onSelectImage(nextAsset);
   };
 
   useEffect(() => {
@@ -59,9 +73,15 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, images, onClose, onSelectImage]);
 
-  const thumbUrl = getMediaUrl(currentImage, 'thumbnail');
-  const previewUrl = getMediaUrl(currentImage, 'preview');
-  const originalUrl = getMediaUrl(currentImage, 'original');
+  useEffect(() => {
+    if (images.length <= 1 || currentIndex < 0) return;
+    const nextIdx = (currentIndex + 1) % images.length;
+    const prevIdx = (currentIndex - 1 + images.length) % images.length;
+    scheduleMediaPrefetch([
+      getMediaUrl(images[nextIdx], 'preview'),
+      getMediaUrl(images[prevIdx], 'preview'),
+    ]);
+  }, [currentIndex, images]);
 
   return (
     <Dialog
@@ -161,39 +181,54 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             </IconButton>
           )}
 
-          {/* Instant blurred thumbnail */}
+          {/* Instant cached 660px grid image — stays opaque underneath until 1360px preview finishes fading in */}
           <Box
             component="img"
-            key={`lb-thumb-${currentImage}`}
-            src={thumbUrl}
+            key={`lb-grid-${currentImage}`}
+            src={gridUrl}
             alt=""
+            decoding="async"
             sx={{
               position: 'absolute',
               maxWidth: '100%',
               maxHeight: '100%',
               objectFit: 'contain',
-              filter: isFullLoaded ? 'none' : 'blur(16px)',
-              opacity: isFullLoaded ? 0 : 0.9,
-              transition: 'opacity 0.35s ease',
+              opacity: isFullLoaded ? 0 : 1,
+              transition:
+                isFullLoaded && !instantRef.current
+                  ? 'opacity 0.05s linear 0.22s'
+                  : 'none',
               pointerEvents: 'none',
             }}
           />
 
-          {/* High-res photo */}
+          {/* High-res 1360px WebP photo */}
           <Box
             component="img"
             key={`lb-preview-${currentImage}`}
             src={previewUrl}
             alt={`${spotName} fullscreen`}
-            onLoad={() => setIsFullLoaded(true)}
+            onLoad={(e) => {
+              const imgEl = e.currentTarget as HTMLImageElement;
+              const finish = () => {
+                markMediaDecoded(previewUrl);
+                setIsFullLoaded(true);
+              };
+              if (typeof imgEl.decode === 'function') {
+                imgEl.decode().then(finish).catch(finish);
+              } else {
+                finish();
+              }
+            }}
             sx={{
               position: 'relative',
               maxWidth: '100%',
               maxHeight: '100%',
               objectFit: 'contain',
               userSelect: 'none',
-              opacity: isFullLoaded ? 1 : 0.3,
-              transition: 'opacity 0.3s ease',
+              opacity: isFullLoaded ? 1 : 0,
+              willChange: isFullLoaded ? 'auto' : 'opacity',
+              transition: instantRef.current ? 'none' : 'opacity 0.2s ease-out',
             }}
           />
 

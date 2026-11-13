@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Spot } from '../types';
 import { formatCoords } from '../utils/geo';
-import { getMediaUrl } from '../utils/media';
+import { getMediaUrl, isMediaDecoded, markMediaDecoded } from '../utils/media';
+
+function decodeAndRun(img: HTMLImageElement, cb: () => void) {
+  if (typeof img.decode === 'function') {
+    img.decode().then(cb).catch(cb);
+  } else {
+    cb();
+  }
+}
 import {
   Box,
   Typography,
@@ -30,6 +38,7 @@ interface StackPhotoItemProps {
   assetId: string;
   index: number;
   spotName: string;
+  scrollRoot: HTMLDivElement | null;
   onOpenLightbox: (assetId: string) => void;
 }
 
@@ -37,14 +46,47 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
   assetId,
   index,
   spotName,
+  scrollRoot,
   onOpenLightbox,
 }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
   const thumbUrl = getMediaUrl(assetId, 'thumbnail');
-  const previewUrl = getMediaUrl(assetId, 'preview');
+  const gridUrl = getMediaUrl(assetId, 'grid');
+  const alreadyDecoded = isMediaDecoded(gridUrl);
+  const instantRef = useRef(alreadyDecoded);
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(alreadyDecoded || index < 6);
+  const [thumbReady, setThumbReady] = useState(alreadyDecoded);
+  const [gridLoaded, setGridLoaded] = useState(alreadyDecoded);
+
+  useEffect(() => {
+    if (inView) return;
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      {
+        root: scrollRoot,
+        rootMargin: '350px 0px',
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [inView, scrollRoot]);
 
   return (
     <Box
+      ref={cardRef}
       onClick={() => onOpenLightbox(assetId)}
       sx={{
         position: 'relative',
@@ -68,43 +110,57 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         },
       }}
     >
-      {/* Fast intrinsic-ratio thumbnail placeholder */}
+      {/* Phase 1: Instant ~25KB WebP thumbnail establishes intrinsic aspect ratio immediately */}
       <Box
         component="img"
         src={thumbUrl}
-        alt=""
-        loading={index < 6 ? 'eager' : 'lazy'}
+        alt={`${spotName} - Photo ${index + 1}`}
+        loading={index < 8 ? 'eager' : 'lazy'}
+        decoding="async"
+        fetchPriority={index < 6 ? 'high' : 'auto'}
+        onLoad={() => setThumbReady(true)}
+        onError={() => setThumbReady(true)}
         sx={{
           display: 'block',
           width: '100%',
           height: 'auto',
-          minHeight: 90,
-          filter: isLoaded ? 'none' : 'blur(10px)',
-          transform: isLoaded ? 'none' : 'scale(1.03)',
-          opacity: isLoaded ? 0 : 0.9,
-          transition: 'opacity 0.35s ease',
+          minHeight: 80,
+          filter: 'blur(1px)',
+          transform: 'scale(1.005)',
+          opacity: gridLoaded ? 0 : 1,
+          transition: gridLoaded && !instantRef.current ? 'opacity 0.05s linear 0.22s' : 'none',
           pointerEvents: 'none',
         }}
       />
 
-      {/* Crisp preview image overlaid cleanly with zero layout shift */}
-      <Box
-        component="img"
-        className="photo-zoom-img"
-        src={previewUrl}
-        alt={`${spotName} - Photo ${index + 1}`}
-        loading={index < 4 ? 'eager' : 'lazy'}
-        onLoad={() => setIsLoaded(true)}
-        sx={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          opacity: isLoaded ? 1 : 0,
-          transition: 'opacity 0.35s ease, transform 0.35s ease',
-        }}
-      />
+      {/* Phase 2: Crisp ~55KB WebP upgrades after decode, keeping thumbnail opaque underneath until fade completes */}
+      {inView && thumbReady && (
+        <Box
+          component="img"
+          className="photo-zoom-img"
+          src={gridUrl}
+          alt={`${spotName} - Photo ${index + 1}`}
+          onLoad={(e) => {
+            const imgEl = e.currentTarget as HTMLImageElement;
+            decodeAndRun(imgEl, () => {
+              markMediaDecoded(gridUrl);
+              setGridLoaded(true);
+            });
+          }}
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: gridLoaded ? 1 : 0,
+            willChange: gridLoaded ? 'auto' : 'opacity',
+            transition: instantRef.current
+              ? 'transform 0.35s ease'
+              : 'opacity 0.2s ease-out, transform 0.35s ease',
+          }}
+        />
+      )}
 
       {/* Subtle hover controls */}
       <Box
@@ -163,18 +219,30 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   distanceFromPrev,
   onOpenLightbox,
 }) => {
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [singleLoaded, setSingleLoaded] = useState(false);
-
   const images = spot.images && spot.images.length > 0 ? spot.images : [];
   const isSingleImage = images.length === 1;
+  const singleAssetId = images[0] || '';
+  const singleThumbUrl = singleAssetId ? getMediaUrl(singleAssetId, 'thumbnail') : '';
+  const singlePreviewUrl = singleAssetId ? getMediaUrl(singleAssetId, 'preview') : '';
+
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const initialSingleReady = isSingleImage && isMediaDecoded(singlePreviewUrl);
+  const singleInstantRef = useRef(initialSingleReady);
+  const [singleThumbReady, setSingleThumbReady] = useState(initialSingleReady);
+  const [singleLoaded, setSingleLoaded] = useState(initialSingleReady);
 
   useEffect(() => {
-    setSingleLoaded(false);
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = 0;
+    const already = isSingleImage && isMediaDecoded(singlePreviewUrl);
+    singleInstantRef.current = already;
+    setSingleThumbReady(already);
+    setSingleLoaded(already);
+  }, [spot.id, spot.name, isSingleImage, singlePreviewUrl]);
+
+  useEffect(() => {
+    if (scrollEl) {
+      scrollEl.scrollTop = 0;
     }
-  }, [spot.id, spot.name]);
+  }, [spot.id, spot.name, scrollEl]);
 
   // Split images into 2 top-to-bottom column stacks (even indices left, odd indices right)
   const leftStack = images
@@ -184,13 +252,9 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
     .map((assetId, index) => ({ assetId, index }))
     .filter((_, idx) => idx % 2 === 1);
 
-  const singleAssetId = images[0] || '';
-  const singleThumbUrl = singleAssetId ? getMediaUrl(singleAssetId, 'thumbnail') : '';
-  const singlePreviewUrl = singleAssetId ? getMediaUrl(singleAssetId, 'preview') : '';
-
   return (
     <Box
-      ref={scrollContainerRef}
+      ref={setScrollEl}
       sx={{
         height: '100%',
         display: 'flex',
@@ -358,6 +422,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             component="img"
             src={singleThumbUrl}
             alt=""
+            decoding="async"
             sx={{
               position: 'absolute',
               inset: 0,
@@ -370,45 +435,62 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             }}
           />
 
-          {/* Progressive crisp foreground image constrained cleanly within panel height */}
+          {/* Fast thumbnail placeholder — stays opaque underneath until foreground reveal finishes */}
           <Box
             component="img"
             key={`single-thumb-${singleAssetId}`}
             src={singleThumbUrl}
             alt=""
+            fetchPriority="high"
+            decoding="async"
+            onLoad={() => setSingleThumbReady(true)}
+            onError={() => setSingleThumbReady(true)}
             sx={{
               position: 'absolute',
               inset: 0,
               width: '100%',
               height: '100%',
               objectFit: 'contain',
-              filter: singleLoaded ? 'none' : 'blur(12px)',
-              opacity: singleLoaded ? 0 : 0.9,
-              transition: 'opacity 0.35s ease',
+              filter: 'blur(1.5px)',
+              opacity: singleLoaded ? 0 : 1,
+              transition:
+                singleLoaded && !singleInstantRef.current
+                  ? 'opacity 0.05s linear 0.22s'
+                  : 'none',
               pointerEvents: 'none',
             }}
           />
 
-          <Box
-            component="img"
-            key={`single-preview-${singleAssetId}`}
-            src={singlePreviewUrl}
-            alt={`${spot.name} - Photo 1`}
-            loading="eager"
-            onLoad={() => setSingleLoaded(true)}
-            sx={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block',
-              opacity: singleLoaded ? 1 : 0.15,
-              transition: 'opacity 0.35s ease, transform 0.35s ease',
-              '&:hover': {
-                transform: 'scale(1.015)',
-              },
-            }}
-          />
+          {singleThumbReady && (
+            <Box
+              component="img"
+              key={`single-preview-${singleAssetId}`}
+              src={singlePreviewUrl}
+              alt={`${spot.name} - Photo 1`}
+              onLoad={(e) => {
+                const imgEl = e.currentTarget as HTMLImageElement;
+                decodeAndRun(imgEl, () => {
+                  markMediaDecoded(singlePreviewUrl);
+                  setSingleLoaded(true);
+                });
+              }}
+              sx={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                display: 'block',
+                opacity: singleLoaded ? 1 : 0,
+                willChange: singleLoaded ? 'auto' : 'opacity',
+                transition: singleInstantRef.current
+                  ? 'transform 0.35s ease'
+                  : 'opacity 0.2s ease-out, transform 0.35s ease',
+                '&:hover': {
+                  transform: 'scale(1.015)',
+                },
+              }}
+            />
+          )}
 
           <Tooltip title="View Fullscreen" arrow>
             <IconButton
@@ -459,6 +541,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
                 assetId={assetId}
                 index={index}
                 spotName={spot.name}
+                scrollRoot={scrollEl}
                 onOpenLightbox={onOpenLightbox}
               />
             ))}
@@ -480,6 +563,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
                 assetId={assetId}
                 index={index}
                 spotName={spot.name}
+                scrollRoot={scrollEl}
                 onOpenLightbox={onOpenLightbox}
               />
             ))}

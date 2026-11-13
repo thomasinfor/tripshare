@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-ssr
+.cache
 *.local
 .env.local
 .env.*.local
