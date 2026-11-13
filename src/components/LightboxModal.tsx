@@ -92,12 +92,12 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
       slotProps={{
         paper: {
           sx: {
-            bgcolor: 'rgba(5, 8, 15, 0.96)',
+            bgcolor: 'rgba(245, 242, 235, 0.98)',
             backdropFilter: 'blur(20px)',
-            borderRadius: 3,
+            borderRadius: '14px',
             overflow: 'hidden',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8)',
+            border: '1px solid rgba(22, 22, 21, 0.12)',
+            boxShadow: '0 25px 60px rgba(22, 22, 21, 0.25)',
             height: '88vh',
             display: 'flex',
             flexDirection: 'column',
@@ -113,16 +113,36 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             px: 3,
-            py: 1.5,
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            bgcolor: 'rgba(15, 23, 42, 0.6)',
+            py: 1.4,
+            borderBottom: '1px solid rgba(22, 22, 21, 0.09)',
+            bgcolor: '#ffffff',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#fff' }}>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontWeight: 400,
+                fontSize: '22px',
+                color: '#161615',
+                lineHeight: 1.1,
+              }}
+            >
               {spotName}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#38bdf8', bgcolor: 'rgba(56, 189, 248, 0.12)', px: 1, py: 0.3, borderRadius: 1, fontWeight: 700 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "'JetBrains Mono', monospace",
+                color: '#161615',
+                bgcolor: 'rgba(22, 22, 21, 0.06)',
+                px: 1.1,
+                py: 0.35,
+                borderRadius: '999px',
+                fontWeight: 600,
+              }}
+            >
               {currentIndex + 1} of {images.length}
             </Typography>
           </Box>
@@ -135,7 +155,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
                 download={`${currentImage}.jpg`}
                 target="_blank"
                 size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}
+                sx={{ color: '#6b6860', '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.06)' } }}
               >
                 <DownloadIcon fontSize="small" />
               </IconButton>
@@ -144,7 +164,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
               <IconButton
                 onClick={onClose}
                 size="small"
-                sx={{ color: 'text.secondary', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}
+                sx={{ color: '#6b6860', '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.06)' } }}
               >
                 <CloseIcon fontSize="small" />
               </IconButton>
@@ -152,7 +172,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           </Box>
         </Box>
 
-        {/* Center Image Viewport */}
+        {/* Center Image Viewport (Warm Matboard) */}
         <Box
           sx={{
             flex: 1,
@@ -160,7 +180,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            bgcolor: '#000000',
+            bgcolor: '#ebe6dc',
             overflow: 'hidden',
           }}
         >
@@ -171,13 +191,14 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
                 position: 'absolute',
                 left: 16,
                 zIndex: 10,
-                bgcolor: 'rgba(15, 23, 42, 0.75)',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(8px)',
-                color: '#fff',
-                '&:hover': { bgcolor: '#0284c7' },
+                border: '1px solid rgba(22, 22, 21, 0.12)',
+                color: '#161615',
+                '&:hover': { bgcolor: '#161615', color: '#f5f2eb' },
               }}
             >
-              <ArrowBackIosNewIcon />
+              <ArrowBackIosNewIcon fontSize="small" />
             </IconButton>
           )}
 
@@ -239,13 +260,14 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
                 position: 'absolute',
                 right: 16,
                 zIndex: 10,
-                bgcolor: 'rgba(15, 23, 42, 0.75)',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(8px)',
-                color: '#fff',
-                '&:hover': { bgcolor: '#0284c7' },
+                border: '1px solid rgba(22, 22, 21, 0.12)',
+                color: '#161615',
+                '&:hover': { bgcolor: '#161615', color: '#f5f2eb' },
               }}
             >
-              <ArrowForwardIosIcon />
+              <ArrowForwardIosIcon fontSize="small" />
             </IconButton>
           )}
         </Box>
@@ -255,17 +277,17 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           sx={{
             px: 3,
             py: 1.2,
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            bgcolor: 'rgba(15, 23, 42, 0.6)',
+            borderTop: '1px solid rgba(22, 22, 21, 0.09)',
+            bgcolor: '#ffffff',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+          <Typography variant="caption" sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace" }}>
             Asset ID: {currentImage}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace" }}>
             Use ← and → arrows to browse photos
           </Typography>
         </Box>

@@ -14,9 +14,9 @@ interface LeafletMapProps {
 
 const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string; maxZoom: number }> = {
   dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> &copy; <a href=\"https://carto.com/attributions\">CARTO</a>',
-    maxZoom: 19,
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxZoom: 16,
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -24,10 +24,10 @@ const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string; maxZoom:
     maxZoom: 18,
   },
   streets: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> &copy; <a href=\"https://carto.com/attributions\">CARTO</a>',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
-  }
+  },
 };
 
 const DEFAULT_DAY_COLORS = ['#f59e0b', '#06b6d4', '#10b981', '#ec4899', '#8b5cf6'];
@@ -177,13 +177,13 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
           const markerHtml = isDayStart
             ? `
-            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(15, 23, 42, 0.92); border: 2px solid ${dayColor}; border-radius: 12px; padding: 2px 7px; color: #ffffff; font-size: 11px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; white-space: nowrap;">
-              <span style="width: 7px; height: 7px; border-radius: 50%; background: ${dayColor}; box-shadow: 0 0 6px ${dayColor};"></span>
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, 0.96); border: 2px solid ${dayColor}; border-radius: 12px; padding: 2px 7px; color: #161615; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; box-shadow: 0 3px 10px rgba(22,22,21,0.2); cursor: pointer; white-space: nowrap;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: ${dayColor};"></span>
               D${dIdx + 1}
             </div>
           `
             : `
-            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${dayColor}; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer;"></div>
+            <div style="width: 9px; height: 9px; border-radius: 50%; background: ${dayColor}; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(22,22,21,0.25); cursor: pointer;"></div>
           `;
 
           const customIcon = L.divIcon({
@@ -334,18 +334,18 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
         // Glow
         L.polyline(drivingSegment, {
-          color: '#38bdf8',
+          color: '#b91c1c',
           weight: 9,
-          opacity: 0.45,
+          opacity: 0.18,
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(routeGroup);
 
         // Core driving line
         L.polyline(drivingSegment, {
-          color: '#06b6d4',
-          weight: 5,
-          opacity: 1.0,
+          color: '#b91c1c',
+          weight: 4.5,
+          opacity: 0.96,
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(routeGroup);

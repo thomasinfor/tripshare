@@ -10,7 +10,6 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import ExploreIcon from '@mui/icons-material/Explore';
 import PublicIcon from '@mui/icons-material/Public';
 import MapIcon from '@mui/icons-material/Map';
 import LayersIcon from '@mui/icons-material/Layers';
@@ -32,7 +31,6 @@ export const Header: React.FC<HeaderProps> = ({
   trip,
   currentDayTitle,
   viewMode,
-  mapProvider,
   mapStyle,
   onOpenTripOverview,
   onToggleDayOverview,
@@ -51,58 +49,61 @@ export const Header: React.FC<HeaderProps> = ({
       elevation={0}
       sx={{
         height: 'var(--header-height)',
-        bgcolor: 'rgba(15, 23, 42, 0.85)',
+        bgcolor: 'rgba(245, 242, 235, 0.94)',
+        color: '#161615',
         backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
         zIndex: 100,
         justifyContent: 'center',
       }}
     >
-      <Toolbar sx={{ px: { xs: 2, sm: 3 }, justifyContent: 'space-between', gap: 2 }}>
-        {/* Brand & Title */}
+      <Toolbar
+        variant="dense"
+        sx={{
+          minHeight: 'var(--header-height)',
+          px: { xs: 1.75, sm: 2.75 },
+          justifyContent: 'space-between',
+          gap: 2,
+        }}
+      >
+        {/* Minimalist Gallery Brand & Serif Title */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
           <Box
             sx={{
-              width: 38,
-              height: 38,
+              width: 26,
+              height: 26,
               flexShrink: 0,
-              borderRadius: 2.5,
-              background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+              borderRadius: '4px',
+              border: '1px solid rgba(22, 22, 21, 0.18)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 0 16px rgba(14, 165, 233, 0.45)',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#161615',
+              bgcolor: 'rgba(255, 255, 255, 0.65)',
             }}
           >
-            <ExploreIcon sx={{ fontSize: 22 }} />
+            IS
           </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#38bdf8',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                display: 'block',
-                lineHeight: 1,
-              }}
-            >
-              TripShare Expedition
-            </Typography>
-            <Typography
-              variant="h6"
-              noWrap
-              sx={{ fontWeight: 700, color: '#ffffff', fontSize: { xs: '14px', sm: '17px' }, lineHeight: 1.3 }}
-            >
-              {trip.title}
-            </Typography>
-          </Box>
+          <Typography
+            variant="h6"
+            noWrap
+            sx={{
+              fontFamily: "'Instrument Serif', Georgia, serif",
+              fontWeight: 400,
+              color: '#161615',
+              fontSize: { xs: '17px', sm: '21px' },
+              lineHeight: 1.1,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {trip.title}
+          </Typography>
         </Box>
 
-        {/* Center: Mode pill */}
+        {/* Center: Mode Pill & Monospace Count */}
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1.5 }}>
           <Chip
             size="small"
@@ -113,25 +114,45 @@ export const Header: React.FC<HeaderProps> = ({
                 ? `${currentDayTitle} Route`
                 : currentDayTitle
             }
-            sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: 600, fontSize: '12.5px' }}
+            sx={{
+              bgcolor: 'rgba(22, 22, 21, 0.045)',
+              color: '#161615',
+              borderColor: 'rgba(22, 22, 21, 0.10)',
+              borderRadius: '999px',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 600,
+              fontSize: '11.5px',
+            }}
           />
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '13px' }}>
-            {totalSpots} spots • {totalPhotos} photos
+          <Typography
+            variant="caption"
+            sx={{
+              fontFamily: "'JetBrains Mono', monospace",
+              color: '#6b6860',
+              fontSize: '11.5px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {totalSpots} spots · {totalPhotos} photos
           </Typography>
         </Box>
 
         {/* Action Controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.9, flexShrink: 0 }}>
           <Button
             size="small"
             variant={viewMode === 'trip-overview' ? 'contained' : 'outlined'}
             onClick={onOpenTripOverview}
-            startIcon={<PublicIcon sx={{ fontSize: 16 }} />}
+            startIcon={<PublicIcon sx={{ fontSize: 15 }} />}
             sx={{
-              borderColor: 'rgba(255,255,255,0.12)',
-              color: viewMode === 'trip-overview' ? '#fff' : 'text.primary',
-              fontSize: '12.5px',
+              borderRadius: '999px',
+              py: 0.45,
+              px: 1.5,
+              fontSize: '12px',
               display: { xs: 'none', sm: 'inline-flex' },
+              ...(viewMode === 'trip-overview'
+                ? { bgcolor: '#161615', color: '#f5f2eb', borderColor: '#161615' }
+                : { borderColor: 'rgba(22, 22, 21, 0.15)', color: '#161615' }),
             }}
           >
             Trip Overview
@@ -141,11 +162,15 @@ export const Header: React.FC<HeaderProps> = ({
             size="small"
             variant={viewMode === 'day-overview' ? 'contained' : 'outlined'}
             onClick={onToggleDayOverview}
-            startIcon={<MapIcon sx={{ fontSize: 16 }} />}
+            startIcon={<MapIcon sx={{ fontSize: 15 }} />}
             sx={{
-              borderColor: 'rgba(255,255,255,0.12)',
-              color: viewMode === 'day-overview' ? '#fff' : 'text.primary',
-              fontSize: '12.5px',
+              borderRadius: '999px',
+              py: 0.45,
+              px: 1.5,
+              fontSize: '12px',
+              ...(viewMode === 'day-overview'
+                ? { bgcolor: '#161615', color: '#f5f2eb', borderColor: '#161615' }
+                : { borderColor: 'rgba(22, 22, 21, 0.15)', color: '#161615' }),
             }}
           >
             {viewMode === 'spot-detail' ? 'Day Route' : viewMode === 'day-overview' ? 'Spot View' : 'Day Route'}
@@ -155,13 +180,17 @@ export const Header: React.FC<HeaderProps> = ({
             <Button
               size="small"
               onClick={onCycleMapStyle}
-              startIcon={<LayersIcon sx={{ fontSize: 16 }} />}
+              startIcon={<LayersIcon sx={{ fontSize: 15 }} />}
               sx={{
-                bgcolor: 'rgba(255,255,255,0.05)',
-                color: 'text.secondary',
-                fontSize: '12px',
+                borderRadius: '999px',
+                py: 0.45,
+                px: 1.3,
+                bgcolor: 'rgba(22, 22, 21, 0.04)',
+                border: '1px solid rgba(22, 22, 21, 0.10)',
+                color: '#6b6860',
+                fontSize: '11.5px',
                 display: { xs: 'none', sm: 'inline-flex' },
-                '&:hover': { color: '#ffffff' },
+                '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.08)' },
               }}
             >
               {mapStyle.charAt(0).toUpperCase() + mapStyle.slice(1)}
@@ -173,12 +202,13 @@ export const Header: React.FC<HeaderProps> = ({
               size="small"
               onClick={onOpenSettings}
               sx={{
-                bgcolor: 'rgba(255,255,255,0.05)',
-                color: 'text.secondary',
-                '&:hover': { color: '#ffffff', bgcolor: 'rgba(255,255,255,0.1)' },
+                bgcolor: 'rgba(22, 22, 21, 0.04)',
+                border: '1px solid rgba(22, 22, 21, 0.10)',
+                color: '#6b6860',
+                '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.08)' },
               }}
             >
-              <SettingsIcon sx={{ fontSize: 18 }} />
+              <SettingsIcon sx={{ fontSize: 17 }} />
             </IconButton>
           </Tooltip>
         </Box>

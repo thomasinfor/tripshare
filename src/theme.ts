@@ -2,37 +2,37 @@ import { createTheme } from '@mui/material/styles';
 
 export const appTheme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
-      main: '#38bdf8',
-      light: '#7dd3fc',
-      dark: '#0284c7',
-      contrastText: '#0f172a',
+      main: '#161615',
+      light: '#2e2e2c',
+      dark: '#000000',
+      contrastText: '#f5f2eb',
     },
     secondary: {
-      main: '#10b981',
-      light: '#34d399',
-      dark: '#059669',
+      main: '#b91c1c',
+      light: '#dc2626',
+      dark: '#991b1b',
       contrastText: '#ffffff',
     },
     background: {
-      default: '#090d16',
-      paper: '#0f172a',
+      default: '#f5f2eb',
+      paper: '#ffffff',
     },
     text: {
-      primary: '#f8fafc',
-      secondary: '#94a3b8',
+      primary: '#161615',
+      secondary: '#6b6860',
     },
-    divider: 'rgba(255, 255, 255, 0.08)',
+    divider: 'rgba(22, 22, 21, 0.10)',
   },
   typography: {
-    fontFamily: "'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
-    h1: { fontFamily: "'Outfit', sans-serif", fontWeight: 700 },
-    h2: { fontFamily: "'Outfit', sans-serif", fontWeight: 700 },
-    h3: { fontFamily: "'Outfit', sans-serif", fontWeight: 700 },
-    h4: { fontFamily: "'Outfit', sans-serif", fontWeight: 700 },
-    h5: { fontFamily: "'Outfit', sans-serif", fontWeight: 600 },
-    h6: { fontFamily: "'Outfit', sans-serif", fontWeight: 600 },
+    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    h1: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, letterSpacing: '-0.015em' },
+    h2: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, letterSpacing: '-0.015em' },
+    h3: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, letterSpacing: '-0.015em' },
+    h4: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, letterSpacing: '-0.015em' },
+    h5: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, letterSpacing: '-0.015em' },
+    h6: { fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400 },
     button: {
       textTransform: 'none',
       fontWeight: 600,
@@ -46,46 +46,60 @@ export const appTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
-          padding: '8px 16px',
+          borderRadius: 999,
+          padding: '6px 14px',
           boxShadow: 'none',
-          transition: 'all 0.2s ease-in-out',
+          transition: 'background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease',
           '&:hover': {
-            boxShadow: '0 4px 16px rgba(56, 189, 248, 0.35)',
-            transform: 'translateY(-1px)',
+            boxShadow: 'none',
           },
         },
-
+        outlined: {
+          borderColor: 'rgba(22, 22, 21, 0.16)',
+          color: '#161615',
+          '&:hover': {
+            borderColor: '#161615',
+            backgroundColor: 'rgba(22, 22, 21, 0.04)',
+          },
+        },
+        contained: {
+          backgroundColor: '#161615',
+          color: '#f5f2eb',
+          '&:hover': {
+            backgroundColor: '#2c2c2a',
+          },
+        },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundColor: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(22, 22, 21, 0.10)',
           borderRadius: 16,
+          boxShadow: '0 18px 46px rgba(22, 22, 21, 0.12)',
         },
       },
     },
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 999,
           fontWeight: 600,
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(22, 22, 21, 0.10)',
         },
       },
     },
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(56, 189, 248, 0.3)',
-          borderRadius: 8,
-          fontSize: '12px',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+          backgroundColor: '#161615',
+          color: '#f5f2eb',
+          border: 'none',
+          borderRadius: 6,
+          fontSize: '11.5px',
+          boxShadow: '0 8px 24px rgba(22, 22, 21, 0.18)',
         },
       },
     },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Spot, ItineraryDay, ViewMode } from '../types';
+import { ItineraryDay, ViewMode } from '../types';
 import { getMediaUrl } from '../utils/media';
 import {
   Box,
@@ -47,7 +47,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const currentDay = days[currentDayIndex];
   const spots = currentDay?.spots || [];
-  const currentSpot = spots[currentSpotIndex];
 
   // Tooltip hover state
   const [hoveredSpotIdx, setHoveredSpotIdx] = useState<number | null>(null);
@@ -103,7 +102,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   // Step calculations for timeline scrubber:
   // Step 0: Day Route Map Overview (the Map icon)
   // Steps 1..N: Spot 0 to Spot N-1
-  const maxStepIndex = spots.length; // e.g. 5 spots => 6 total nodes (0 to 5)
+  const maxStepIndex = spots.length;
   const currentStep =
     viewMode === 'day-overview' || viewMode === 'trip-overview'
       ? 0
@@ -118,14 +117,14 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       sx={{
         position: 'relative',
         height: 'var(--bottom-bar-height)',
-        bgcolor: 'rgba(15, 23, 42, 0.90)',
+        bgcolor: 'rgba(245, 242, 235, 0.95)',
         backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        borderTop: '1px solid rgba(22, 22, 21, 0.10)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         px: { xs: 1.5, sm: 2.5 },
-        py: 0.8,
+        py: 0.75,
         zIndex: 100,
       }}
     >
@@ -135,7 +134,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         spacing={1.5}
         sx={{ alignItems: 'center', justifyContent: 'space-between' }}
       >
-        {/* Day Tabs - active chip expanded, inactive chips compact so all fit */}
+        {/* Day Tabs - active chip expanded, inactive chips compact */}
         <Box
           sx={{
             display: 'flex',
@@ -143,7 +142,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             gap: 0.5,
             overflowX: 'auto',
             minWidth: 0,
-            py: 0.2,
+            py: 0.15,
             scrollbarWidth: 'none',
             '&::-webkit-scrollbar': { display: 'none' },
           }}
@@ -151,7 +150,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           {/* Entire Trip Overview Button */}
           <Tooltip title={`View Entire ${days.length}-Day Route Map`} arrow>
             <Chip
-              icon={<PublicIcon sx={{ fontSize: '13px !important' }} />}
+              icon={<PublicIcon sx={{ fontSize: '13px !important', color: 'inherit !important' }} />}
               label="All Map"
               size="small"
               clickable
@@ -160,22 +159,28 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               sx={{
                 height: 24,
                 px: 0.5,
-                bgcolor: viewMode === 'trip-overview' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                borderColor: viewMode === 'trip-overview' ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)',
-                color: viewMode === 'trip-overview' ? '#38bdf8' : 'text.secondary',
-                fontWeight: 700,
+                borderRadius: '999px',
+                fontFamily: "'JetBrains Mono', monospace",
+                bgcolor: viewMode === 'trip-overview' ? '#161615' : 'rgba(22, 22, 21, 0.035)',
+                borderColor: viewMode === 'trip-overview' ? '#161615' : 'rgba(22, 22, 21, 0.10)',
+                color: viewMode === 'trip-overview' ? '#f5f2eb' : '#6b6860',
+                fontWeight: 600,
                 fontSize: '11px',
                 flexShrink: 0,
+                '&:hover': {
+                  bgcolor: viewMode === 'trip-overview' ? '#2c2c2a' : 'rgba(22, 22, 21, 0.08)',
+                  color: viewMode === 'trip-overview' ? '#f5f2eb' : '#161615',
+                },
               }}
             />
           </Tooltip>
 
-          <Box sx={{ width: '1px', height: 16, bgcolor: 'rgba(255, 255, 255, 0.12)', mx: 0.2, flexShrink: 0 }} />
+          <Box sx={{ width: '1px', height: 15, bgcolor: 'rgba(22, 22, 21, 0.12)', mx: 0.2, flexShrink: 0 }} />
 
           {/* Individual Day Tabs */}
           {days.map((day, idx) => {
             const isActive = viewMode !== 'trip-overview' && idx === currentDayIndex;
-            const dayColor = day.color || '#38bdf8';
+            const dayColor = day.color || '#b91c1c';
             return (
               <Tooltip
                 key={day.date || idx}
@@ -192,30 +197,31 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                   avatar={
                     <Box
                       sx={{
-                        width: isActive ? '8px !important' : '6px !important',
-                        height: isActive ? '8px !important' : '6px !important',
+                        width: isActive ? '7px !important' : '6px !important',
+                        height: isActive ? '7px !important' : '6px !important',
                         borderRadius: '50% !important',
                         bgcolor: dayColor,
-                        boxShadow: isActive ? `0 0 6px ${dayColor}` : 'none',
                       }}
                     />
                   }
                   sx={{
                     height: 24,
                     minWidth: isActive ? 'auto' : 38,
-                    px: isActive ? 0.6 : 0.2,
-                    bgcolor: isActive ? `${dayColor}28` : 'rgba(255, 255, 255, 0.04)',
-                    borderColor: isActive ? dayColor : 'rgba(255, 255, 255, 0.08)',
-                    color: isActive ? '#ffffff' : 'text.secondary',
-                    fontWeight: isActive ? 700 : 500,
+                    px: isActive ? 0.65 : 0.2,
+                    borderRadius: '999px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    bgcolor: isActive ? '#161615' : 'rgba(22, 22, 21, 0.035)',
+                    borderColor: isActive ? '#161615' : 'rgba(22, 22, 21, 0.10)',
+                    color: isActive ? '#f5f2eb' : '#6b6860',
+                    fontWeight: 600,
                     fontSize: '11px',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.18s ease',
                     '&:hover': {
-                      bgcolor: `${dayColor}20`,
-                      borderColor: dayColor,
-                      color: '#ffffff',
+                      bgcolor: isActive ? '#2c2c2a' : 'rgba(22, 22, 21, 0.08)',
+                      borderColor: isActive ? '#161615' : 'rgba(22, 22, 21, 0.25)',
+                      color: isActive ? '#f5f2eb' : '#161615',
                     },
                   }}
                 />
@@ -225,7 +231,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         </Box>
 
         {/* Action Controls: Day Route Toggle & Autoplay Tour */}
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
+        <Stack direction="row" spacing={0.9} sx={{ alignItems: 'center', flexShrink: 0 }}>
           <Button
             size="small"
             variant={viewMode === 'day-overview' ? 'contained' : 'outlined'}
@@ -233,10 +239,13 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             startIcon={<MapIcon sx={{ fontSize: 14 }} />}
             sx={{
               fontSize: '11.5px',
-              py: 0.35,
-              px: 1,
-              borderColor: 'rgba(255, 255, 255, 0.15)',
+              py: 0.3,
+              px: 1.2,
+              borderRadius: '999px',
               display: { xs: 'none', sm: 'inline-flex' },
+              ...(viewMode === 'day-overview'
+                ? { bgcolor: '#161615', color: '#f5f2eb', borderColor: '#161615' }
+                : { borderColor: 'rgba(22, 22, 21, 0.14)', color: '#161615' }),
             }}
           >
             {viewMode === 'day-overview' ? 'Spot Detail' : 'Day Route'}
@@ -254,9 +263,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     value={tourProgressPercent}
                     size={16}
                     thickness={6}
-                    sx={{ color: '#10b981' }}
+                    sx={{ color: '#b91c1c' }}
                   />
-                  <PauseIcon sx={{ position: 'absolute', fontSize: 10, color: '#34d399' }} />
+                  <PauseIcon sx={{ position: 'absolute', fontSize: 10, color: '#b91c1c' }} />
                 </Box>
               ) : (
                 <PlayArrowIcon sx={{ fontSize: 15 }} />
@@ -265,12 +274,16 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             sx={{
               fontSize: '11.5px',
               fontWeight: 600,
-              py: 0.35,
-              px: 1.2,
-              bgcolor: isPlaying ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-              color: isPlaying ? '#34d399' : 'text.secondary',
-              border: isPlaying ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+              py: 0.3,
+              px: 1.25,
+              borderRadius: '999px',
+              bgcolor: isPlaying ? 'rgba(185, 28, 28, 0.08)' : 'rgba(22, 22, 21, 0.04)',
+              color: isPlaying ? '#b91c1c' : '#161615',
+              border: isPlaying ? '1px solid rgba(185, 28, 28, 0.45)' : '1px solid rgba(22, 22, 21, 0.12)',
               transition: 'all 0.2s',
+              '&:hover': {
+                bgcolor: isPlaying ? 'rgba(185, 28, 28, 0.14)' : 'rgba(22, 22, 21, 0.09)',
+              },
             }}
           >
             {isPlaying ? `Pause (${remainingSeconds}s)` : 'Tour'}
@@ -278,21 +291,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         </Stack>
       </Stack>
 
-      {/* Main Scrubber Row */}
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 0.3 }}>
+      {/* Main Scrubber Row (Minimalist Track Beads) */}
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
         {/* Previous Button */}
         <Button
           size="small"
           onClick={onPrev}
-          startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
+          startIcon={<ArrowBackIcon sx={{ fontSize: 15 }} />}
           sx={{
             minWidth: { xs: 34, sm: 76 },
-            px: { xs: 0.8, sm: 1.5 },
-            py: 0.6,
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            color: '#ffffff',
-            fontSize: '12px',
+            px: { xs: 0.8, sm: 1.4 },
+            py: 0.35,
+            borderRadius: '999px',
+            bgcolor: 'rgba(22, 22, 21, 0.04)',
+            border: '1px solid rgba(22, 22, 21, 0.12)',
+            color: '#161615',
+            fontSize: '11.5px',
+            '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
@@ -305,9 +320,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         </Button>
 
         {/* Timeline Slider Track */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.3, minWidth: 0 }}>
-          <Box className="timeline-track-container" sx={{ position: 'relative', height: 28, display: 'flex', alignItems: 'center' }}>
-            {/* Base Rail and Active Progress Fill - exactly aligned to dot centers (11px left and right) */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box className="timeline-track-container" sx={{ position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>
+            {/* Base Rail and Active Progress Fill - aligned to node centers */}
             <Box className="timeline-track-rail">
               <Box
                 className="timeline-progress-fill"
@@ -355,19 +370,18 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                       <Box
                         sx={{
                           position: 'absolute',
-                          bottom: 34,
+                          bottom: 30,
                           left: '50%',
                           transform: 'translateX(-50%)',
-                          bgcolor: 'rgba(15, 23, 42, 0.95)',
-                          backdropFilter: 'blur(14px)',
-                          border: '1px solid rgba(56, 189, 248, 0.35)',
-                          borderRadius: 2,
+                          bgcolor: '#ffffff',
+                          border: '1px solid rgba(22, 22, 21, 0.12)',
+                          borderRadius: '10px',
                           p: 1,
                           display: 'flex',
                           alignItems: 'center',
                           gap: 1.2,
                           whiteSpace: 'nowrap',
-                          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.5)',
+                          boxShadow: '0 12px 28px rgba(22, 22, 21, 0.14)',
                           pointerEvents: 'none',
                           zIndex: 1000,
                           animation: 'fade-in 0.15s ease-out',
@@ -378,15 +392,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                             component="img"
                             src={getMediaUrl(spot.images[0], 'thumbnail')}
                             alt={spot.name}
-                            sx={{ width: 42, height: 42, borderRadius: 1, objectFit: 'cover', bgcolor: '#000' }}
+                            sx={{ width: 42, height: 42, borderRadius: '4px', objectFit: 'cover', bgcolor: '#ebe6dc' }}
                           />
                         )}
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, color: '#161615' }}>
                             #{idx + 1} {spot.name}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 11, display: 'block' }}>
-                            {spot.time || ''} • {spot.images.length} photos
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                              color: '#6b6860',
+                              fontSize: 11,
+                              display: 'block',
+                            }}
+                          >
+                            {spot.time || '—'} · {spot.images.length} photos
                           </Typography>
                         </Box>
                       </Box>
@@ -396,44 +418,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               })}
             </Box>
           </Box>
-
-          {/* Status text */}
-          <Box sx={{ textAlign: 'center', fontSize: '11.5px', color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {viewMode === 'trip-overview' ? (
-              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '11.5px' }}>
-                🌍 Entire Expedition Route Map (All {days.length} Days Color Coded)
-              </Typography>
-            ) : viewMode === 'day-overview' ? (
-              <Typography variant="caption" sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '11.5px' }}>
-                📍 Full Day {currentDayIndex + 1} Route Overview ({spots.length} spots • {currentDay?.driving_distance_km || 0} km drive)
-              </Typography>
-            ) : currentSpot ? (
-              <Typography variant="caption" sx={{ fontSize: '11.5px' }}>
-                <strong style={{ color: '#38bdf8' }}>Spot {currentSpotIndex + 1} of {spots.length}:</strong>{' '}
-                <span style={{ color: '#ffffff', fontWeight: 600 }}>{currentSpot.name}</span>
-                {currentSpot.driving_distance_km ? (
-                  <span style={{ color: '#34d399', marginLeft: 8 }}>
-                    🚗 +{currentSpot.driving_distance_km} km
-                  </span>
-                ) : null}
-              </Typography>
-            ) : null}
-          </Box>
         </Box>
 
         {/* Next Button */}
         <Button
           size="small"
           onClick={onNext}
-          endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+          endIcon={<ArrowForwardIcon sx={{ fontSize: 15 }} />}
           sx={{
             minWidth: { xs: 34, sm: 76 },
-            px: { xs: 0.8, sm: 1.5 },
-            py: 0.6,
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            color: '#ffffff',
-            fontSize: '12px',
+            px: { xs: 0.8, sm: 1.4 },
+            py: 0.35,
+            borderRadius: '999px',
+            bgcolor: 'rgba(22, 22, 21, 0.04)',
+            border: '1px solid rgba(22, 22, 21, 0.12)',
+            color: '#161615',
+            fontSize: '11.5px',
+            '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>

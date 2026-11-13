@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { Box, Typography, Button } from '@mui/material';
-import { Spot, ItineraryDay, MapStyle, ViewMode } from '../types';
+import { ItineraryDay, MapStyle, ViewMode } from '../types';
 import { KeyRound, Sparkles } from 'lucide-react';
 
 interface GoogleMapViewProps {
@@ -91,15 +91,23 @@ const GoogleMapRouteController: React.FC<{
 
       if (drivingPts) {
         drivingPts.forEach(pt => bounds.extend(pt));
+        const halo = new google.maps.Polyline({
+          path: drivingPts,
+          geodesic: true,
+          strokeColor: color,
+          strokeOpacity: 0.2,
+          strokeWeight: 9,
+          map,
+        });
         const line = new google.maps.Polyline({
           path: drivingPts,
           geodesic: true,
           strokeColor: color,
           strokeOpacity: 0.95,
-          strokeWeight: 4.5,
+          strokeWeight: 4,
           map,
         });
-        polylines.push(line);
+        polylines.push(halo, line);
       }
       currentSpots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
 
@@ -111,27 +119,35 @@ const GoogleMapRouteController: React.FC<{
         const bgLine = new google.maps.Polyline({
           path: fullPts,
           geodesic: true,
-          strokeColor: '#64748b',
-          strokeOpacity: 0.45,
+          strokeColor: '#9ca3af',
+          strokeOpacity: 0.55,
           strokeWeight: 2.5,
           map,
         });
         polylines.push(bgLine);
       }
 
-      // Real driving route for this spot
+      // Real driving route for this spot in crisp Gallery crimson
       if (currentSpot.driving_route && currentSpot.driving_route.length > 1) {
         const segPts = currentSpot.driving_route.map(p => ({ lat: p[0], lng: p[1] }));
 
+        const haloLine = new google.maps.Polyline({
+          path: segPts,
+          geodesic: true,
+          strokeColor: '#b91c1c',
+          strokeOpacity: 0.18,
+          strokeWeight: 9,
+          map,
+        });
         const segLine = new google.maps.Polyline({
           path: segPts,
           geodesic: true,
-          strokeColor: '#06b6d4',
-          strokeOpacity: 1.0,
-          strokeWeight: 5,
+          strokeColor: '#b91c1c',
+          strokeOpacity: 0.96,
+          strokeWeight: 4.5,
           map,
         });
-        polylines.push(segLine);
+        polylines.push(haloLine, segLine);
 
         const bounds = new google.maps.LatLngBounds();
         segPts.forEach(pt => bounds.extend(pt));
@@ -199,12 +215,13 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
       case 'satellite':
         return 'hybrid';
       case 'streets':
-        return 'roadmap';
       case 'dark':
       default:
         return 'roadmap';
     }
   }, [mapStyle]);
+
+  const colorScheme = mapStyle === 'dark' ? ColorScheme.DARK : ColorScheme.LIGHT;
 
   if (!apiKey || apiKey.trim() === '') {
     return (
@@ -216,7 +233,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           p: 3,
-          bgcolor: '#090d16',
+          bgcolor: '#f5f2eb',
         }}
       >
         <Box
@@ -225,10 +242,9 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             p: 4,
             textAlign: 'center',
             borderRadius: 3,
-            bgcolor: 'rgba(15, 23, 42, 0.9)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+            bgcolor: '#ffffff',
+            border: '1px solid rgba(22, 22, 21, 0.10)',
+            boxShadow: '0 20px 50px rgba(22, 22, 21, 0.12)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -240,19 +256,19 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               width: 52,
               height: 52,
               borderRadius: '50%',
-              bgcolor: 'rgba(245, 158, 11, 0.15)',
-              color: '#f59e0b',
+              bgcolor: 'rgba(185, 28, 28, 0.1)',
+              color: '#b91c1c',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <KeyRound size={28} />
+            <KeyRound size={26} />
           </Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff' }}>
+          <Typography variant="h5" sx={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 28, color: '#161615' }}>
             Google Maps API Key Required
           </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+          <Typography variant="body2" sx={{ color: '#6b6860', lineHeight: 1.6 }}>
             To view Google Maps, set <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>.env.local</code> or enter your key in settings.
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 1.5, mt: 1 }}>
@@ -269,7 +285,6 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               fullWidth
               onClick={onSwitchToLeaflet}
               startIcon={<Sparkles size={16} />}
-              sx={{ borderColor: 'rgba(255,255,255,0.15)' }}
             >
               Switch to OpenStreetMap (Free, No Key)
             </Button>
@@ -287,6 +302,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           defaultZoom={11}
           mapTypeId={mapTypeId}
           mapId="DEMO_MAP_ID"
+          colorScheme={colorScheme}
           gestureHandling="greedy"
           disableDefaultUI={false}
           mapTypeControl={false}
@@ -305,7 +321,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             allDays.map((day, dIdx) =>
               day.spots.map((spot, sIdx) => {
                 const isDayStart = sIdx === 0;
-                const dayColor = day.color || '#38bdf8';
+                const dayColor = day.color || '#b91c1c';
                 return (
                   <AdvancedMarker
                     key={`${dIdx}-${sIdx}`}
@@ -319,14 +335,15 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
-                          background: 'rgba(15, 23, 42, 0.92)',
+                          background: 'rgba(255, 255, 255, 0.96)',
                           border: `2px solid ${dayColor}`,
                           borderRadius: '12px',
                           padding: '2px 7px',
-                          color: '#ffffff',
+                          color: '#161615',
+                          fontFamily: "'JetBrains Mono', monospace",
                           fontSize: '11px',
-                          fontWeight: 700,
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                          fontWeight: 600,
+                          boxShadow: '0 3px 10px rgba(22, 22, 21, 0.2)',
                           cursor: 'pointer',
                           transform: 'translateY(-50%)',
                           userSelect: 'none',
@@ -339,7 +356,6 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                             height: 7,
                             borderRadius: '50%',
                             backgroundColor: dayColor,
-                            boxShadow: `0 0 6px ${dayColor}`,
                           }}
                         />
                         D{dIdx + 1}
@@ -347,12 +363,12 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                     ) : (
                       <div
                         style={{
-                          width: 10,
-                          height: 10,
+                          width: 9,
+                          height: 9,
                           borderRadius: '50%',
                           backgroundColor: dayColor,
                           border: '1.5px solid #ffffff',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                          boxShadow: '0 2px 6px rgba(22, 22, 21, 0.25)',
                           cursor: 'pointer',
                           transform: 'translate(-50%, -50%)',
                         }}
@@ -365,19 +381,45 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           ) : (
             currentSpots.map((spot, idx) => {
               const isCurrent = viewMode === 'spot-detail' && idx === currentSpotIndex;
+              const inactiveBorder =
+                viewMode === 'day-overview'
+                  ? (currentDay.color || '#161615')
+                  : '#b91c1c';
+              const size = isCurrent ? 30 : 22;
+
               return (
                 <AdvancedMarker
                   key={spot.id || idx}
                   position={{ lat: spot.lat, lng: spot.lng }}
                   onClick={() => onSelectSpot(currentDayIndex, idx)}
+                  title={`${idx + 1}. ${spot.name}`}
+                  zIndex={isCurrent ? 500 : 10}
                 >
-                  <Pin
-                    background={isCurrent ? '#06b6d4' : (currentDay.color || '#1e293b')}
-                    borderColor={isCurrent ? '#ffffff' : '#64748b'}
-                    glyphColor={isCurrent ? '#000000' : '#ffffff'}
-                    glyph={`${idx + 1}`}
-                    scale={isCurrent ? 1.3 : 1.0}
-                  />
+                  <div
+                    style={{
+                      width: size,
+                      height: size,
+                      borderRadius: '50%',
+                      background: isCurrent ? '#b91c1c' : '#ffffff',
+                      border: `2px solid ${isCurrent ? '#ffffff' : inactiveBorder}`,
+                      color: isCurrent ? '#ffffff' : '#161615',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 700,
+                      fontSize: isCurrent ? '12px' : '10px',
+                      lineHeight: 1,
+                      boxShadow: isCurrent
+                        ? '0 4px 12px rgba(22, 22, 21, 0.35)'
+                        : '0 2px 8px rgba(22, 22, 21, 0.2)',
+                      cursor: 'pointer',
+                      transform: 'translateY(50%)',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
                 </AdvancedMarker>
               );
             })

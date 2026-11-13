@@ -109,7 +109,7 @@ export const App: React.FC = () => {
     return (localStorage.getItem('tripshare_provider') as MapProvider) || 'google';
   });
   const [mapStyle, setMapStyle] = useState<MapStyle>(() => {
-    return (localStorage.getItem('tripshare_style') as MapStyle) || 'dark';
+    return (localStorage.getItem('tripshare_style_paper') as MapStyle) || 'streets';
   });
   const [googleApiKey, setGoogleApiKey] = useState<string>(() => {
     return (
@@ -181,15 +181,15 @@ export const App: React.FC = () => {
     setMapStyle(config.mapStyle);
     setGoogleApiKey(config.googleApiKey);
     localStorage.setItem('tripshare_provider', config.provider);
-    localStorage.setItem('tripshare_style', config.mapStyle);
+    localStorage.setItem('tripshare_style_paper', config.mapStyle);
     localStorage.setItem('tripshare_google_key', config.googleApiKey);
   };
 
   const handleCycleMapStyle = () => {
-    const styles: MapStyle[] = ['dark', 'satellite', 'streets'];
+    const styles: MapStyle[] = ['streets', 'satellite', 'dark'];
     const nextStyle = styles[(styles.indexOf(mapStyle) + 1) % styles.length];
     setMapStyle(nextStyle);
-    localStorage.setItem('tripshare_style', nextStyle);
+    localStorage.setItem('tripshare_style_paper', nextStyle);
   };
 
   // Navigation handlers
@@ -299,8 +299,8 @@ export const App: React.FC = () => {
         height: '100vh',
         width: '100vw',
         overflow: 'hidden',
-        bgcolor: '#090d16',
-        color: '#f8fafc',
+        bgcolor: '#f5f2eb',
+        color: '#161615',
         position: 'relative',
       }}
     >
@@ -329,16 +329,16 @@ export const App: React.FC = () => {
           overflow: 'hidden',
         }}
       >
-        {/* Left Half: Spot Showcase — only in split view */}
+        {/* Left Split: Spot Showcase — 58% width on desktop */}
         {isSplitView && (
           <Box
             sx={{
-              width: { xs: '100%', md: '50%' },
-              maxWidth: { xs: '100%', md: '50%' },
+              width: { xs: '100%', md: '58%' },
+              maxWidth: { xs: '100%', md: '58%' },
               height: { xs: '50%', md: '100%' },
-              bgcolor: '#0f172a',
-              borderRight: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.08)' },
-              borderBottom: { xs: '1px solid rgba(255, 255, 255, 0.08)', md: 'none' },
+              bgcolor: '#f5f2eb',
+              borderRight: { xs: 'none', md: '1px solid rgba(22, 22, 21, 0.10)' },
+              borderBottom: { xs: '1px solid rgba(22, 22, 21, 0.10)', md: 'none' },
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -351,6 +351,9 @@ export const App: React.FC = () => {
               spotNumber={currentSpotIndex + 1}
               totalSpots={spots.length}
               dayTitle={currentDay?.title || `Day ${currentDayIndex + 1}`}
+              dayNumber={currentDayIndex + 1}
+              totalDays={trip.days.length}
+              dayDate={currentDay?.date}
               dayColor={currentDay?.color}
               distanceFromPrev={currentSpotIndex > 0 ? currentSpot.driving_distance_km : undefined}
               onOpenLightbox={(img) => setLightboxImage(img)}
@@ -358,11 +361,11 @@ export const App: React.FC = () => {
           </Box>
         )}
 
-        {/* Right Half / Full Map */}
+        {/* Right Split / Full Map */}
         <Box
           sx={{
             flex: 1,
-            width: isMapFullscreen ? '100%' : { xs: '100%', md: '50%' },
+            width: isMapFullscreen ? '100%' : { xs: '100%', md: '42%' },
             height: isSplitView ? { xs: '50%', md: '100%' } : '100%',
             position: 'relative',
             overflow: 'hidden',

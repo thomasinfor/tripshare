@@ -1,20 +1,15 @@
 import React from 'react';
 import { NormalizedTrip } from '../types';
+import { getMediaUrl } from '../utils/media';
 import {
   Card,
   CardContent,
   Typography,
   Button,
   Box,
-  Chip,
 } from '@mui/material';
 import NavigationIcon from '@mui/icons-material/Navigation';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
-import PlaceIcon from '@mui/icons-material/Place';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ExploreIcon from '@mui/icons-material/Explore';
 
 interface TripOverviewOverlayProps {
   trip: NormalizedTrip;
@@ -33,6 +28,7 @@ export const TripOverviewOverlay: React.FC<TripOverviewOverlayProps> = ({
     0
   );
   const totalKm = trip.days.reduce((acc, d) => acc + (d.driving_distance_km || 0), 0);
+  const coverAssetId = trip.cover_image || trip.days[0]?.spots[0]?.images?.[0] || '';
 
   return (
     <Card
@@ -47,143 +43,223 @@ export const TripOverviewOverlay: React.FC<TripOverviewOverlayProps> = ({
         display: 'flex',
         flexDirection: 'column',
         zIndex: 1000,
-        boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+        p: 0,
+        overflow: 'hidden',
+        bgcolor: 'rgba(255, 255, 255, 0.96)',
+        border: '1px solid rgba(22, 22, 21, 0.10)',
+        boxShadow: '0 18px 46px rgba(22, 22, 21, 0.14)',
         animation: 'fade-slide-up 0.4s ease-out',
       }}
     >
+      {/* Full-bleed Cover Photo Hero Banner */}
+      {coverAssetId && (
+        <Box sx={{ position: 'relative', height: 112, flexShrink: 0, overflow: 'hidden', bgcolor: '#ebe6dc' }}>
+          <Box
+            component="img"
+            src={getMediaUrl(coverAssetId, 'grid')}
+            alt={trip.title}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0) 20%, #ffffff 100%)',
+            }}
+          />
+        </Box>
+      )}
+
       <CardContent
         sx={{
           p: 2.5,
+          pt: coverAssetId ? 1.25 : 2.5,
           '&:last-child': { pb: 2.5 },
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
           minHeight: 0,
           overflow: 'hidden',
+          gap: 1.5,
         }}
       >
         {/* Eyebrow */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexShrink: 0 }}>
-          <Chip
-            icon={<ExploreIcon sx={{ fontSize: '15px !important', color: '#38bdf8' }} />}
-            label="Complete Expedition Route Map"
-            size="small"
-            sx={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {trip.days.length} Days
+        <Box sx={{ flexShrink: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.9,
+              mb: 0.65,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '11px',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: '#6b6860',
+            }}
+          >
+            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#b91c1c', flexShrink: 0 }} />
+            <span>COMPLETE EXPEDITION  ·  {trip.days.length} DAYS</span>
+          </Box>
+
+          <Typography
+            variant="h5"
+            component="h2"
+            sx={{
+              fontFamily: "'Instrument Serif', Georgia, serif",
+              color: '#161615',
+              mb: 0.6,
+              fontWeight: 400,
+              fontSize: '26px',
+              lineHeight: 1.1,
+            }}
+          >
+            {trip.title}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: '#57544d',
+              lineHeight: 1.55,
+              fontSize: 12.5,
+              display: { xs: 'none', sm: '-webkit-box' },
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {trip.description}
           </Typography>
         </Box>
 
-        <Typography variant="h5" component="h2" sx={{ color: '#ffffff', mb: 0.75, fontWeight: 700, lineHeight: 1.25, flexShrink: 0 }}>
-          {trip.title}
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
+        {/* Hairline 4-Column Stat Strip */}
+        <Box
           sx={{
-            mb: 2,
-            lineHeight: 1.5,
-            fontSize: 12.5,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            borderTop: '1px solid rgba(22, 22, 21, 0.10)',
+            borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
+            py: 1,
             flexShrink: 0,
-            display: { xs: 'none', sm: '-webkit-box' },
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
           }}
         >
-          {trip.description}
-        </Typography>
-
-        {/* Stats Grid */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mb: 2, flexShrink: 0 }}>
           {[
-            { icon: <CalendarMonthIcon sx={{ fontSize: 17, color: '#38bdf8', mb: 0.3 }} />, value: trip.days.length, label: 'Days' },
-            { icon: <PlaceIcon sx={{ fontSize: 17, color: '#38bdf8', mb: 0.3 }} />, value: totalSpots, label: 'Spots' },
-            { icon: <PhotoCameraIcon sx={{ fontSize: 17, color: '#38bdf8', mb: 0.3 }} />, value: totalPhotos, label: 'Photos' },
-            { icon: <DirectionsCarIcon sx={{ fontSize: 17, color: '#38bdf8', mb: 0.3 }} />, value: `${Math.round(totalKm)} km`, label: 'Drive' },
-          ].map(({ icon, value, label }) => (
+            { value: trip.days.length, label: 'Days' },
+            { value: totalSpots, label: 'Stops' },
+            { value: totalPhotos, label: 'Photos' },
+            { value: `${Math.round(totalKm)}`, label: 'Km' },
+          ].map(({ value, label }, idx) => (
             <Box
               key={label}
               sx={{
-                p: 1,
-                textAlign: 'center',
-                borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                px: idx === 0 ? 0 : 1,
+                pr: 1,
+                borderRight: idx < 3 ? '1px solid rgba(22, 22, 21, 0.10)' : 'none',
               }}
             >
-              {icon}
-              <Typography variant="h6" sx={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+              <Typography
+                sx={{
+                  fontFamily: "'Instrument Serif', Georgia, serif",
+                  fontSize: '19px',
+                  fontWeight: 400,
+                  color: '#161615',
+                  lineHeight: 1.1,
+                }}
+              >
                 {value}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase' }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: '#6b6860',
+                }}
+              >
                 {label}
               </Typography>
             </Box>
           ))}
         </Box>
 
-        {/* Day Color Legend */}
-        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
-          Daily Routes (Color Coded on Map):
-        </Typography>
+        {/* Connected 15-Day Route Timeline */}
         <Box
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.8,
-            mb: 2,
             flex: 1,
             minHeight: 0,
             overflowY: 'auto',
             pr: 0.5,
             '&::-webkit-scrollbar': { width: 4 },
             '&::-webkit-scrollbar-thumb': {
-              bgcolor: 'rgba(255, 255, 255, 0.2)',
+              bgcolor: 'rgba(22, 22, 21, 0.18)',
               borderRadius: 2,
             },
           }}
         >
           {trip.days.map((day, idx) => {
-            const dayColor = day.color || '#38bdf8';
+            const dayColor = day.color || '#b91c1c';
             return (
               <Box
                 key={day.date || idx}
                 onClick={() => onSelectDay(idx)}
                 sx={{
+                  position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.2,
-                  p: 1,
-                  borderRadius: 1.5,
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  gap: 1.25,
+                  pl: 2.5,
+                  pr: 1,
+                  py: 0.85,
+                  borderRadius: '8px',
                   cursor: 'pointer',
                   flexShrink: 0,
-                  transition: 'all 0.2s',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: dayColor, transform: 'translateX(4px)' },
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    flexShrink: 0,
+                  transition: 'background-color 0.16s ease',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 7,
+                    top: 0,
+                    bottom: 0,
+                    width: '1px',
+                    bgcolor: 'rgba(22, 22, 21, 0.12)',
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 3.5,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 8,
+                    height: 8,
                     borderRadius: '50%',
                     bgcolor: dayColor,
-                    boxShadow: `0 0 8px ${dayColor}`,
-                  }}
-                />
+                    border: '1.5px solid #ffffff',
+                    boxShadow: '0 0 0 1px rgba(22, 22, 21, 0.10)',
+                  },
+                  '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.04)' },
+                }}
+              >
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" noWrap sx={{ color: '#fff', fontWeight: 600, fontSize: 12.5 }}>
+                  <Typography variant="body2" noWrap sx={{ color: '#161615', fontWeight: 600, fontSize: 12.5 }}>
                     Day {idx + 1}: {day.title || day.date}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
-                    {day.date} • {day.spots.length} spots{day.driving_distance_km ? ` • ${day.driving_distance_km} km` : ''}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: '#6b6860',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {day.date} · {day.spots.length} spots
+                    {day.driving_distance_km ? ` · ${day.driving_distance_km} km` : ''}
                   </Typography>
                 </Box>
-                <ArrowForwardIcon sx={{ fontSize: 15, color: dayColor, flexShrink: 0 }} />
+                <ArrowForwardIcon sx={{ fontSize: 14, color: '#6b6860', flexShrink: 0 }} />
               </Box>
             );
           })}
@@ -195,7 +271,15 @@ export const TripOverviewOverlay: React.FC<TripOverviewOverlayProps> = ({
           size="large"
           onClick={onStartExpedition}
           startIcon={<NavigationIcon />}
-          sx={{ py: 1.2, fontSize: '14px', flexShrink: 0, boxShadow: '0 6px 20px rgba(14, 165, 233, 0.4)' }}
+          sx={{
+            py: 1.1,
+            fontSize: '13.5px',
+            flexShrink: 0,
+            bgcolor: '#161615',
+            color: '#f5f2eb',
+            borderRadius: '999px',
+            '&:hover': { bgcolor: '#2c2c2a' },
+          }}
         >
           Start Day 1 Tour
         </Button>

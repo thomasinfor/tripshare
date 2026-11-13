@@ -2,6 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Spot } from '../types';
 import { formatCoords } from '../utils/geo';
 import { getMediaUrl, isMediaDecoded, markMediaDecoded } from '../utils/media';
+import {
+  Box,
+  Typography,
+  Chip,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 
 function decodeAndRun(img: HTMLImageElement, cb: () => void) {
   if (typeof img.decode === 'function') {
@@ -10,25 +19,15 @@ function decodeAndRun(img: HTMLImageElement, cb: () => void) {
     cb();
   }
 }
-import {
-  Box,
-  Typography,
-  Chip,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import ExploreIcon from '@mui/icons-material/Explore';
 
 interface SpotShowcaseProps {
   spot: Spot;
   spotNumber: number;
   totalSpots: number;
   dayTitle: string;
+  dayNumber?: number;
+  totalDays?: number;
+  dayDate?: string;
   dayColor?: string;
   distanceFromPrev?: number;
   onOpenLightbox: (imageUrl: string) => void;
@@ -91,19 +90,18 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
       sx={{
         position: 'relative',
         width: '100%',
-        borderRadius: 2,
+        borderRadius: '2px',
         overflow: 'hidden',
-        bgcolor: '#050811',
+        bgcolor: '#ebe6dc',
         cursor: 'zoom-in',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
-        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(22, 22, 21, 0.06)',
+        transition: 'box-shadow 0.22s ease',
         '&:hover': {
-          borderColor: 'rgba(56, 189, 248, 0.5)',
-          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 8px 24px rgba(22, 22, 21, 0.14)',
         },
         '&:hover .photo-zoom-img': {
-          transform: 'scale(1.025)',
+          transform: 'scale(1.02)',
         },
         '&:hover .photo-hover-overlay': {
           opacity: 1,
@@ -133,7 +131,7 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         }}
       />
 
-      {/* Phase 2: Crisp ~55KB WebP upgrades after decode, keeping thumbnail opaque underneath until fade completes */}
+      {/* Phase 2: Crisp WebP upgrades after decode, keeping thumbnail opaque underneath until fade completes */}
       {inView && thumbReady && (
         <Box
           component="img"
@@ -162,13 +160,13 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         />
       )}
 
-      {/* Subtle hover controls */}
+      {/* Subtle gallery hover controls */}
       <Box
         className="photo-hover-overlay"
         sx={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.45) 100%)',
+          background: 'linear-gradient(180deg, rgba(22,22,21,0.18) 0%, transparent 32%, transparent 68%, rgba(22,22,21,0.28) 100%)',
           opacity: 0,
           transition: 'opacity 0.2s ease',
           pointerEvents: 'none',
@@ -183,10 +181,12 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
           size="small"
           sx={{
             height: 20,
+            fontFamily: "'JetBrains Mono', monospace",
             fontSize: 10.5,
-            fontWeight: 700,
-            bgcolor: 'rgba(15, 23, 42, 0.8)',
-            color: '#f8fafc',
+            fontWeight: 600,
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
+            color: '#161615',
+            borderColor: 'rgba(22, 22, 21, 0.10)',
             backdropFilter: 'blur(6px)',
           }}
         />
@@ -195,9 +195,10 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
             width: 26,
             height: 26,
             borderRadius: '50%',
-            bgcolor: 'rgba(15, 23, 42, 0.8)',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(6px)',
-            color: '#ffffff',
+            color: '#161615',
+            border: '1px solid rgba(22, 22, 21, 0.10)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -214,8 +215,9 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   spot,
   spotNumber,
   totalSpots,
-  dayTitle,
-  dayColor = '#38bdf8',
+  dayNumber,
+  dayDate,
+  dayColor = '#b91c1c',
   distanceFromPrev,
   onOpenLightbox,
 }) => {
@@ -252,6 +254,14 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
     .map((assetId, index) => ({ assetId, index }))
     .filter((_, idx) => idx % 2 === 1);
 
+  const eyebrowLabel = [
+    dayNumber ? `DAY ${String(dayNumber).padStart(2, '0')}` : null,
+    `STOP ${String(spotNumber).padStart(2, '0')} OF ${String(totalSpots).padStart(2, '0')}`,
+    dayDate || null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
+
   return (
     <Box
       ref={setScrollEl}
@@ -259,89 +269,85 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        p: { xs: 2, sm: 2.5 },
+        p: { xs: 2, sm: 2.75 },
         gap: 2,
         overflowY: isSingleImage ? 'hidden' : 'auto',
         overflowX: 'hidden',
-        bgcolor: '#0a0f1d',
-        background: 'linear-gradient(180deg, #0f172a 0%, #070b14 100%)',
-        '&::-webkit-scrollbar': { width: 6 },
+        bgcolor: '#f5f2eb',
+        '&::-webkit-scrollbar': { width: 5 },
         '&::-webkit-scrollbar-thumb': {
-          bgcolor: 'rgba(255, 255, 255, 0.18)',
-          borderRadius: 3,
+          bgcolor: 'rgba(22, 22, 21, 0.18)',
+          borderRadius: 99,
         },
       }}
     >
-      {/* Top Header / Meta */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8, flexShrink: 0 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Chip
-            size="small"
-            label={dayTitle}
+      {/* Editorial Header */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.9, flexShrink: 0 }}>
+        {/* Monospace Eyebrow */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '11px',
+            fontWeight: 500,
+            letterSpacing: '0.11em',
+            textTransform: 'uppercase',
+            color: '#6b6860',
+          }}
+        >
+          <Box
             sx={{
-              bgcolor: 'rgba(255, 255, 255, 0.08)',
-              color: dayColor,
-              fontWeight: 700,
-              fontSize: 12,
-              border: `1px solid ${dayColor}40`,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              bgcolor: dayColor || '#b91c1c',
+              flexShrink: 0,
             }}
           />
-          <Chip
-            size="small"
-            icon={<ExploreIcon sx={{ fontSize: 14, color: '#38bdf8 !important' }} />}
-            label={`Stop ${spotNumber} of ${totalSpots}`}
-            sx={{
-              bgcolor: 'rgba(56, 189, 248, 0.1)',
-              color: '#38bdf8',
-              fontWeight: 600,
-              fontSize: 12,
-            }}
-          />
-          {distanceFromPrev !== undefined && distanceFromPrev > 0 && (
-            <Chip
-              size="small"
-              icon={<DirectionsCarIcon sx={{ fontSize: 14, color: '#94a3b8 !important' }} />}
-              label={`${distanceFromPrev} km`}
-              sx={{
-                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                color: 'text.secondary',
-                fontSize: 12,
-              }}
-            />
-          )}
+          <span>{eyebrowLabel}</span>
         </Box>
 
+        {/* Instrument Serif Title */}
         <Typography
           variant="h4"
           component="h1"
           sx={{
-            fontWeight: 800,
-            fontSize: { xs: '1.35rem', sm: '1.75rem' },
-            letterSpacing: '-0.02em',
-            color: '#f8fafc',
-            mt: 0.25,
-            lineHeight: 1.25,
+            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontWeight: 400,
+            fontSize: { xs: '1.85rem', sm: '2.35rem' },
+            letterSpacing: '-0.015em',
+            color: '#161615',
+            lineHeight: 1.06,
           }}
         >
           {spot.name}
         </Typography>
 
-        {/* Location & Time Subbar */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          {spot.time && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: 13 }}>
-              <AccessTimeIcon sx={{ fontSize: 15 }} />
-              <span>{spot.time}</span>
-            </Box>
+        {/* Monospace Metadata Hairline Strip */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            columnGap: 1.75,
+            rowGap: 0.5,
+            pb: 1.5,
+            borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '11.5px',
+            color: '#6b6860',
+          }}
+        >
+          {spot.time && <span>{spot.time}</span>}
+          {distanceFromPrev !== undefined && distanceFromPrev > 0 && (
+            <span>+{distanceFromPrev} km drive</span>
           )}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: 13 }}>
-            <LocationOnIcon sx={{ fontSize: 15 }} />
-            <span>{formatCoords(spot.lat, spot.lng)}</span>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: 13 }}>
-            <PhotoCameraIcon sx={{ fontSize: 15 }} />
-            <span>{images.length} {images.length === 1 ? 'Photo' : 'Photos'}</span>
-          </Box>
+          <span>{formatCoords(spot.lat, spot.lng)}</span>
+          <span>
+            {images.length} {images.length === 1 ? 'photo' : 'photos'}
+          </span>
           {spot.google_maps_place?.url && (
             <Box
               component="a"
@@ -349,16 +355,13 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               sx={{
-                color: '#38bdf8',
-                fontSize: 13,
+                color: '#b91c1c',
+                fontWeight: 600,
                 textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.5,
                 '&:hover': { textDecoration: 'underline' },
               }}
             >
-              <span>View on Google Maps ↗</span>
+              Google Maps ↗
             </Box>
           )}
         </Box>
@@ -367,8 +370,11 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           <Typography
             variant="body2"
             sx={{
-              color: '#cbd5e1',
-              lineHeight: 1.55,
+              color: '#4a4842',
+              fontSize: '14px',
+              lineHeight: 1.65,
+              maxWidth: '66ch',
+              pt: 0.25,
               ...(isSingleImage
                 ? {
                     display: '-webkit-box',
@@ -394,10 +400,10 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             p: 6,
-            color: 'text.secondary',
+            color: '#6b6860',
           }}
         >
-          <PhotoCameraIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
+          <PhotoCameraIcon sx={{ fontSize: 44, mb: 1, opacity: 0.45 }} />
           <Typography variant="body2">No photos recorded for this spot</Typography>
         </Box>
       ) : isSingleImage ? (
@@ -409,15 +415,15 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             minHeight: 0,
             width: '100%',
             position: 'relative',
-            borderRadius: 2.5,
+            borderRadius: '3px',
             overflow: 'hidden',
-            bgcolor: '#050811',
+            bgcolor: '#ebe6dc',
             cursor: 'zoom-in',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(22, 22, 21, 0.09)',
+            boxShadow: '0 4px 18px rgba(22, 22, 21, 0.07)',
           }}
         >
-          {/* Ambient full-width backdrop for portrait or ultra-wide aspect ratios */}
+          {/* Soft warm matboard ambient backdrop for portrait or ultra-wide aspect ratios */}
           <Box
             component="img"
             src={singleThumbUrl}
@@ -429,7 +435,8 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: 'blur(28px) brightness(0.42)',
+              filter: 'blur(32px) brightness(1.04) saturate(0.85)',
+              opacity: 0.38,
               transform: 'scale(1.1)',
               pointerEvents: 'none',
             }}
@@ -503,10 +510,11 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
                 position: 'absolute',
                 bottom: 12,
                 right: 12,
-                bgcolor: 'rgba(15, 23, 42, 0.8)',
+                bgcolor: 'rgba(255, 255, 255, 0.92)',
                 backdropFilter: 'blur(8px)',
-                color: '#ffffff',
-                '&:hover': { bgcolor: '#0284c7' },
+                color: '#161615',
+                border: '1px solid rgba(22, 22, 21, 0.12)',
+                '&:hover': { bgcolor: '#161615', color: '#f5f2eb' },
               }}
             >
               <FullscreenIcon fontSize="small" />
@@ -520,7 +528,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'flex-start',
-            gap: 1.5,
+            gap: 1.25,
             width: '100%',
             pb: 1,
           }}
@@ -532,7 +540,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: 1.5,
+              gap: 1.25,
             }}
           >
             {leftStack.map(({ assetId, index }) => (
@@ -554,7 +562,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: 1.5,
+              gap: 1.25,
             }}
           >
             {rightStack.map(({ assetId, index }) => (
