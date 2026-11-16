@@ -292,18 +292,22 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
             <PublicIcon sx={{ fontSize: 15, color: '#b91c1c' }} />
             <Typography
               sx={{
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '11px',
+                fontSize: { xs: '10.5px', sm: '11px' },
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 color: '#6b6860',
+                whiteSpace: 'nowrap',
               }}
             >
-              Archive · {trips.length} {trips.length === 1 ? 'Expedition' : 'Expeditions'}
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Archive ·{' '}
+              </Box>
+              {trips.length} {trips.length === 1 ? 'Expedition' : 'Expeditions'}
             </Typography>
           </Box>
         </Toolbar>
@@ -313,7 +317,8 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
         maxWidth="lg"
         sx={{
           flex: 1,
-          py: { xs: 4, sm: 6.5 },
+          pt: { xs: 3.5, sm: 6.5 },
+          pb: { xs: 'calc(32px + env(safe-area-inset-bottom, 0px))', sm: 6.5 },
           px: { xs: 2, sm: 3.5 },
         }}
       >
@@ -544,11 +549,11 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
                     {/* Details Sheet */}
                     <Box
                       sx={{
-                        p: { xs: 2.5, sm: 3.5 },
+                        p: { xs: 2, sm: 3.5 },
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        gap: 2.5,
+                        gap: { xs: 2, sm: 2.5 },
                       }}
                     >
                       <Box>
@@ -557,6 +562,7 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            flexWrap: 'wrap',
                             gap: 1,
                             mb: 1.25,
                           }}
@@ -627,7 +633,7 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
                             borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
                             py: 1.5,
                             mb: 2,
-                            gap: 1,
+                            gap: { xs: 0.5, sm: 1 },
                           }}
                         >
                           {[
@@ -650,7 +656,7 @@ export const TripCatalog: React.FC<TripCatalogProps> = ({
                               <Typography
                                 sx={{
                                   fontFamily: "'JetBrains Mono', monospace",
-                                  fontSize: '15px',
+                                  fontSize: { xs: '13.5px', sm: '15px' },
                                   fontWeight: 600,
                                   color: '#161615',
                                 }}

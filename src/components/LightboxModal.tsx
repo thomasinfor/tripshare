@@ -36,6 +36,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
   const initialFullReady = isMediaDecoded(previewUrl);
   const instantRef = useRef(initialFullReady);
   const [isFullLoaded, setIsFullLoaded] = useState(initialFullReady);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const already = isMediaDecoded(previewUrl);
@@ -87,46 +88,54 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
     <Dialog
       open={true}
       onClose={onClose}
-      maxWidth="xl"
+      maxWidth={false}
       fullWidth
       slotProps={{
         paper: {
           sx: {
             bgcolor: 'rgba(245, 242, 235, 0.98)',
             backdropFilter: 'blur(20px)',
-            borderRadius: '14px',
+            borderRadius: { xs: 0, sm: '14px' },
+            m: { xs: 0, sm: 2 },
+            width: { xs: '100%', sm: 'calc(100% - 32px)' },
+            maxWidth: { xs: '100%', sm: '1400px' },
             overflow: 'hidden',
-            border: '1px solid rgba(22, 22, 21, 0.12)',
+            border: { xs: 'none', sm: '1px solid rgba(22, 22, 21, 0.12)' },
             boxShadow: '0 25px 60px rgba(22, 22, 21, 0.25)',
-            height: '88vh',
+            height: { xs: '100dvh', sm: '88dvh' },
+            maxHeight: { xs: '100dvh', sm: '90dvh' },
             display: 'flex',
             flexDirection: 'column',
           },
         },
       }}
     >
-      <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         {/* Top Bar */}
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            px: 3,
-            py: 1.4,
+            gap: 1.5,
+            px: { xs: 1.75, sm: 3 },
+            py: { xs: 1.1, sm: 1.4 },
             borderBottom: '1px solid rgba(22, 22, 21, 0.09)',
             bgcolor: '#ffffff',
+            flexShrink: 0,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, flex: 1, minWidth: 0 }}>
             <Typography
               variant="subtitle1"
+              noWrap
               sx={{
                 fontFamily: "'Instrument Serif', Georgia, serif",
                 fontWeight: 400,
-                fontSize: '22px',
+                fontSize: { xs: '17px', sm: '22px' },
                 color: '#161615',
                 lineHeight: 1.1,
+                minWidth: 0,
               }}
             >
               {spotName}
@@ -141,13 +150,15 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
                 py: 0.35,
                 borderRadius: '999px',
                 fontWeight: 600,
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
             >
               {currentIndex + 1} of {images.length}
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
             <Tooltip title="Download original photo">
               <IconButton
                 component="a"
@@ -172,24 +183,44 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           </Box>
         </Box>
 
-        {/* Center Image Viewport (Warm Matboard) */}
+        {/* Center Image Viewport (Warm Matboard) with Touch Swipe */}
         <Box
+          onTouchStart={(e) => {
+            if (e.touches.length === 1) {
+              touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+          }}
+          onTouchEnd={(e) => {
+            const start = touchStartRef.current;
+            touchStartRef.current = null;
+            if (!start || images.length <= 1 || e.changedTouches.length === 0) return;
+            const dx = e.changedTouches[0].clientX - start.x;
+            const dy = e.changedTouches[0].clientY - start.y;
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+              if (dx < 0) handleNext();
+              else handlePrev();
+            }
+          }}
           sx={{
             flex: 1,
+            minHeight: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
             bgcolor: '#ebe6dc',
             overflow: 'hidden',
+            touchAction: 'pan-y',
           }}
         >
           {images.length > 1 && (
             <IconButton
+              size="small"
+              aria-label="Previous photo"
               onClick={(e) => handlePrev(e)}
               sx={{
                 position: 'absolute',
-                left: 16,
+                left: { xs: 8, sm: 16 },
                 zIndex: 10,
                 bgcolor: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(8px)',
@@ -255,10 +286,12 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
 
           {images.length > 1 && (
             <IconButton
+              size="small"
+              aria-label="Next photo"
               onClick={(e) => handleNext(e)}
               sx={{
                 position: 'absolute',
-                right: 16,
+                right: { xs: 8, sm: 16 },
                 zIndex: 10,
                 bgcolor: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(8px)',
@@ -275,20 +308,46 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
         {/* Bottom Filename Bar */}
         <Box
           sx={{
-            px: 3,
-            py: 1.2,
+            px: { xs: 1.75, sm: 3 },
+            pt: 1.1,
+            pb: { xs: 'calc(10px + env(safe-area-inset-bottom, 0px))', sm: 1.2 },
             borderTop: '1px solid rgba(22, 22, 21, 0.09)',
             bgcolor: '#ffffff',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: 1.5,
+            flexShrink: 0,
           }}
         >
-          <Typography variant="caption" sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace" }}>
+          <Typography
+            variant="caption"
+            noWrap
+            sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}
+          >
             Asset ID: {currentImage}
           </Typography>
-          <Typography variant="caption" sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace" }}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#6b6860',
+              fontFamily: "'JetBrains Mono', monospace",
+              display: { xs: 'none', sm: 'inline' },
+              whiteSpace: 'nowrap',
+            }}
+          >
             Use ← and → arrows to browse photos
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#6b6860',
+              fontFamily: "'JetBrains Mono', monospace",
+              display: { xs: 'inline', sm: 'none' },
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Swipe to browse
           </Typography>
         </Box>
       </DialogContent>

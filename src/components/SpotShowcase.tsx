@@ -8,6 +8,7 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  useMediaQuery,
 } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
@@ -105,6 +106,12 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         },
         '&:hover .photo-hover-overlay': {
           opacity: 1,
+        },
+        '@media (hover: none)': {
+          '& .photo-hover-overlay': {
+            opacity: 1,
+            background: 'linear-gradient(180deg, transparent 68%, rgba(22,22,21,0.28) 100%)',
+          },
         },
       }}
     >
@@ -227,6 +234,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   const singleThumbUrl = singleAssetId ? getMediaUrl(singleAssetId, 'thumbnail') : '';
   const singlePreviewUrl = singleAssetId ? getMediaUrl(singleAssetId, 'preview') : '';
 
+  const isMobileScreen = useMediaQuery('(max-width:599.95px)');
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const initialSingleReady = isSingleImage && isMediaDecoded(singlePreviewUrl);
   const singleInstantRef = useRef(initialSingleReady);
@@ -269,9 +277,9 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        p: { xs: 2, sm: 2.75 },
-        gap: 2,
-        overflowY: isSingleImage ? 'hidden' : 'auto',
+        p: { xs: 1.75, sm: 2.75 },
+        gap: { xs: 1.5, sm: 2 },
+        overflowY: { xs: 'auto', sm: isSingleImage ? 'hidden' : 'auto' },
         overflowX: 'hidden',
         bgcolor: '#f5f2eb',
         '&::-webkit-scrollbar': { width: 5 },
@@ -282,15 +290,16 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
       }}
     >
       {/* Editorial Header */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.9, flexShrink: 0 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.75, sm: 0.9 }, flexShrink: 0 }}>
         {/* Monospace Eyebrow */}
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: 1,
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '11px',
+            fontSize: { xs: '10.5px', sm: '11px' },
             fontWeight: 500,
             letterSpacing: '0.11em',
             textTransform: 'uppercase',
@@ -316,10 +325,10 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           sx={{
             fontFamily: "'Instrument Serif', Georgia, serif",
             fontWeight: 400,
-            fontSize: { xs: '1.85rem', sm: '2.35rem' },
+            fontSize: { xs: '1.5rem', sm: '2.1rem', md: '2.35rem' },
             letterSpacing: '-0.015em',
             color: '#161615',
-            lineHeight: 1.06,
+            lineHeight: 1.08,
           }}
         >
           {spot.name}
@@ -331,12 +340,12 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',
-            columnGap: 1.75,
+            columnGap: { xs: 1.25, sm: 1.75 },
             rowGap: 0.5,
-            pb: 1.5,
+            pb: { xs: 1.15, sm: 1.5 },
             borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '11.5px',
+            fontSize: { xs: '11px', sm: '11.5px' },
             color: '#6b6860',
           }}
         >
@@ -371,16 +380,16 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             variant="body2"
             sx={{
               color: '#4a4842',
-              fontSize: '14px',
+              fontSize: { xs: '13.5px', sm: '14px' },
               lineHeight: 1.65,
               maxWidth: '66ch',
               pt: 0.25,
               ...(isSingleImage
                 ? {
-                    display: '-webkit-box',
-                    WebkitLineClamp: { xs: 2, sm: 3 },
+                    display: { xs: 'block', sm: '-webkit-box' },
+                    WebkitLineClamp: { sm: 3 },
                     WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
+                    overflow: { xs: 'visible', sm: 'hidden' },
                   }
                 : {}),
             }}
@@ -399,7 +408,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            p: 6,
+            p: { xs: 4, sm: 6 },
             color: '#6b6860',
           }}
         >
@@ -407,12 +416,12 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           <Typography variant="body2">No photos recorded for this spot</Typography>
         </Box>
       ) : isSingleImage ? (
-        /* Single Image Mode: Full width, bounded height so it never overflows vertically */
+        /* Single Image Mode: Full width, bounded height on desktop, scrollable min-height on mobile */
         <Box
           onClick={() => onOpenLightbox(singleAssetId)}
           sx={{
             flex: 1,
-            minHeight: 0,
+            minHeight: { xs: 240, sm: 0 },
             width: '100%',
             position: 'relative',
             borderRadius: '3px',
@@ -521,8 +530,30 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             </IconButton>
           </Tooltip>
         </Box>
+      ) : isMobileScreen ? (
+        /* Mobile Multi-Image Mode: Full-width single-column stack */
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.25,
+            width: '100%',
+            pb: 1,
+          }}
+        >
+          {images.map((assetId, index) => (
+            <StackPhotoItem
+              key={`${assetId}-${index}`}
+              assetId={assetId}
+              index={index}
+              spotName={spot.name}
+              scrollRoot={scrollEl}
+              onOpenLightbox={onOpenLightbox}
+            />
+          ))}
+        </Box>
       ) : (
-        /* Multi-Image Mode: 2-Column Top-to-Bottom Image Stacks */
+        /* Tablet/Desktop Multi-Image Mode: 2-Column Top-to-Bottom Image Stacks */
         <Box
           sx={{
             display: 'flex',

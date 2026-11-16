@@ -31,11 +31,13 @@ function getMapBoundsPadding(
       const left = Math.min(panelRightEdge + 56, Math.floor(w * 0.56));
       return { top: 56, right: 56, bottom: 56, left };
     }
-    const bottom = Math.min(Math.floor(h * 0.45) + 32, Math.floor(h * 0.58));
-    return { top: 36, right: 36, bottom, left: 36 };
+    const bottom = Math.min(Math.floor(h * 0.48) + 28, Math.floor(h * 0.6));
+    return { top: 28, right: 24, bottom, left: 24 };
   }
 
-  return { top: 64, right: 64, bottom: 64, left: 64 };
+  return w < 600
+    ? { top: 28, right: 28, bottom: 28, left: 28 }
+    : { top: 64, right: 64, bottom: 64, left: 64 };
 }
 
 const GoogleMapRouteController: React.FC<{
@@ -165,6 +167,9 @@ const GoogleMapRouteController: React.FC<{
 
     const mapDiv = map.getDiv();
     const applyCamera = () => {
+      if (mapDiv && (mapDiv.clientWidth === 0 || mapDiv.clientHeight === 0)) {
+        return;
+      }
       if (activeBounds && !activeBounds.isEmpty()) {
         map.fitBounds(activeBounds, getMapBoundsPadding(mapDiv, viewMode));
       } else if (viewMode === 'spot-detail' && currentSpot) {

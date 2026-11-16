@@ -76,6 +76,9 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
             border: '1px solid rgba(22, 22, 21, 0.12)',
             borderRadius: '16px',
             boxShadow: '0 25px 60px rgba(22, 22, 21, 0.22)',
+            m: { xs: 1.5, sm: 3 },
+            width: { xs: 'calc(100% - 24px)', sm: '100%' },
+            maxHeight: 'calc(100dvh - 24px)',
           },
         },
       }}
@@ -86,30 +89,32 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(22, 22, 21, 0.09)',
-          pb: 1.75,
+          px: { xs: 2, sm: 3 },
+          py: { xs: 1.5, sm: 2 },
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-          <PublicIcon sx={{ color: '#b91c1c' }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+          <PublicIcon sx={{ color: '#b91c1c', flexShrink: 0 }} />
           <Typography
             variant="h6"
+            noWrap
             sx={{
               fontFamily: "'Instrument Serif', Georgia, serif",
               fontWeight: 400,
-              fontSize: '24px',
+              fontSize: { xs: '20px', sm: '24px' },
               color: '#161615',
             }}
           >
-            Map Settings & Configuration
+            Map Settings &amp; Configuration
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: '#6b6860', '&:hover': { color: '#161615' } }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#6b6860', '&:hover': { color: '#161615' }, flexShrink: 0 }}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <form onSubmit={handleSubmit}>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 3 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
           {/* Map Engine Provider */}
           <FormControl component="fieldset">
             <FormLabel
@@ -236,6 +241,8 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
                     color: '#6b6860',
                     borderColor: 'rgba(22, 22, 21, 0.14)',
                     py: 1,
+                    px: { xs: 0.75, sm: 1.5 },
+                    fontSize: { xs: '12px', sm: '13px' },
                     textTransform: 'capitalize',
                     '&.Mui-selected': {
                       color: '#f5f2eb',
@@ -268,7 +275,7 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
           />
         </DialogContent>
 
-        <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(22, 22, 21, 0.09)', gap: 1 }}>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2.25 }, borderTop: '1px solid rgba(22, 22, 21, 0.09)', gap: 1 }}>
           <Button variant="outlined" onClick={onClose}>
             Cancel
           </Button>

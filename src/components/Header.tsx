@@ -66,13 +66,13 @@ export const Header: React.FC<HeaderProps> = ({
         variant="dense"
         sx={{
           minHeight: 'var(--header-height)',
-          px: { xs: 1.75, sm: 2.75 },
+          px: { xs: 1.25, sm: 2.75 },
           justifyContent: 'space-between',
-          gap: 2,
+          gap: { xs: 1, sm: 2 },
         }}
       >
         {/* Back to Archive Pill + Gallery Brand & Serif Title */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.75, sm: 1.25 }, flex: 1, minWidth: 0, overflow: 'hidden' }}>
           <Tooltip title="All expeditions">
             <Button
               component="a"
@@ -86,19 +86,20 @@ export const Header: React.FC<HeaderProps> = ({
               startIcon={<ArrowBackIcon sx={{ fontSize: '14px !important' }} />}
               sx={{
                 minWidth: 0,
-                px: 1.1,
+                px: { xs: 0.85, sm: 1.1 },
                 py: 0.4,
                 borderRadius: '4px',
                 border: '1px solid rgba(22, 22, 21, 0.14)',
                 bgcolor: 'rgba(255, 255, 255, 0.65)',
                 color: '#161615',
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '11px',
+                fontSize: { xs: '10.5px', sm: '11px' },
                 fontWeight: 600,
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
                 textDecoration: 'none',
                 flexShrink: 0,
+                '& .MuiButton-startIcon': { mr: { xs: 0.35, sm: 0.75 } },
                 '&:hover': {
                   bgcolor: '#ffffff',
                   borderColor: 'rgba(22, 22, 21, 0.30)',
@@ -113,8 +114,9 @@ export const Header: React.FC<HeaderProps> = ({
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.25,
+              gap: { xs: 0.75, sm: 1.25 },
               minWidth: 0,
+              overflow: 'hidden',
               cursor: 'pointer',
               '&:hover .header-monogram': {
                 borderColor: '#b91c1c',
@@ -130,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
                 flexShrink: 0,
                 borderRadius: '4px',
                 border: '1px solid rgba(22, 22, 21, 0.18)',
-                display: 'flex',
+                display: { xs: 'none', sm: 'flex' },
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: "'JetBrains Mono', monospace",
@@ -195,7 +197,27 @@ export const Header: React.FC<HeaderProps> = ({
         </Box>
 
         {/* Action Controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.9, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.6, sm: 0.9 }, flexShrink: 0 }}>
+          <Tooltip title="Trip Overview" arrow>
+            <IconButton
+              size="small"
+              aria-label="Trip Overview"
+              onClick={onOpenTripOverview}
+              sx={{
+                display: { xs: 'inline-flex', sm: 'none' },
+                bgcolor: viewMode === 'trip-overview' ? '#161615' : 'rgba(22, 22, 21, 0.04)',
+                border: '1px solid',
+                borderColor: viewMode === 'trip-overview' ? '#161615' : 'rgba(22, 22, 21, 0.12)',
+                color: viewMode === 'trip-overview' ? '#f5f2eb' : '#161615',
+                '&:hover': {
+                  bgcolor: viewMode === 'trip-overview' ? '#2c2c2a' : 'rgba(22, 22, 21, 0.08)',
+                },
+              }}
+            >
+              <PublicIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+
           <Button
             size="small"
             variant={viewMode === 'trip-overview' ? 'contained' : 'outlined'}
@@ -223,15 +245,39 @@ export const Header: React.FC<HeaderProps> = ({
             sx={{
               borderRadius: '999px',
               py: 0.45,
-              px: 1.5,
-              fontSize: '12px',
+              px: { xs: 1.05, sm: 1.5 },
+              minWidth: 0,
+              fontSize: { xs: '11px', sm: '12px' },
+              '& .MuiButton-startIcon': { mr: { xs: 0.4, sm: 0.75 } },
               ...(viewMode === 'day-overview'
                 ? { bgcolor: '#161615', color: '#f5f2eb', borderColor: '#161615' }
                 : { borderColor: 'rgba(22, 22, 21, 0.15)', color: '#161615' }),
             }}
           >
-            {viewMode === 'spot-detail' ? 'Day Route' : viewMode === 'day-overview' ? 'Spot View' : 'Day Route'}
+            <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+              {viewMode === 'day-overview' ? 'Spot' : 'Route'}
+            </Box>
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+              {viewMode === 'spot-detail' ? 'Day Route' : viewMode === 'day-overview' ? 'Spot View' : 'Day Route'}
+            </Box>
           </Button>
+
+          <Tooltip title={`Map Style: ${mapStyle.toUpperCase()} — Tap to cycle`} arrow>
+            <IconButton
+              size="small"
+              aria-label="Cycle map style"
+              onClick={onCycleMapStyle}
+              sx={{
+                display: { xs: 'inline-flex', sm: 'none' },
+                bgcolor: 'rgba(22, 22, 21, 0.04)',
+                border: '1px solid rgba(22, 22, 21, 0.10)',
+                color: '#6b6860',
+                '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.08)' },
+              }}
+            >
+              <LayersIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
 
           <Tooltip title={`Map Style: ${mapStyle.toUpperCase()} — Click to cycle`} arrow>
             <Button
@@ -257,6 +303,7 @@ export const Header: React.FC<HeaderProps> = ({
           <Tooltip title="Map Engine & Settings" arrow>
             <IconButton
               size="small"
+              aria-label="Map Settings"
               onClick={onOpenSettings}
               sx={{
                 bgcolor: 'rgba(22, 22, 21, 0.04)',

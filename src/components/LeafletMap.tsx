@@ -45,6 +45,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const lastBoundsRef = useRef<L.LatLngBounds | null>(null);
+  const lastPointRef = useRef<[number, number] | null>(null);
+  const wasHiddenRef = useRef(false);
 
   // Initialize Map
   useEffect(() => {
@@ -73,10 +76,27 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     markersLayerRef.current = markersGroup;
     routeLayerRef.current = routeGroup;
 
+    const el = containerRef.current;
+    wasHiddenRef.current = el.clientWidth === 0 || el.clientHeight === 0;
+
     const resizeObserver = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w === 0 || h === 0) {
+        wasHiddenRef.current = true;
+        return;
+      }
       map.invalidateSize();
+      if (wasHiddenRef.current) {
+        wasHiddenRef.current = false;
+        if (lastBoundsRef.current) {
+          map.fitBounds(lastBoundsRef.current, { padding: [36, 36], maxZoom: 14 });
+        } else if (lastPointRef.current) {
+          map.setView(lastPointRef.current, 13);
+        }
+      }
     });
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(el);
 
     return () => {
       resizeObserver.disconnect();
@@ -227,11 +247,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       // Fit bounds to show all spots in Iceland
       if (allCoordsForBounds.length > 0) {
         const bounds = L.latLngBounds(allCoordsForBounds);
-        map.flyToBounds(bounds, {
-          ...getOverviewPadding('trip-overview'),
-          maxZoom: 13,
-          duration: 1.2
-        });
+        lastBoundsRef.current = bounds;
+        lastPointRef.current = null;
+        if (containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
+          map.flyToBounds(bounds, {
+            ...getOverviewPadding('trip-overview'),
+            maxZoom: 13,
+            duration: 1.2
+          });
+        }
       }
       return;
     }
@@ -312,11 +336,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
       if (dayBoundsCoords.length > 0) {
         const bounds = L.latLngBounds(dayBoundsCoords);
-        map.flyToBounds(bounds, {
-          ...getOverviewPadding('day-overview'),
-          maxZoom: 14,
-          duration: 1.1
-        });
+        lastBoundsRef.current = bounds;
+        lastPointRef.current = null;
+        if (containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
+          map.flyToBounds(bounds, {
+            ...getOverviewPadding('day-overview'),
+            maxZoom: 14,
+            duration: 1.1
+          });
+        }
       }
       return;
     }
@@ -406,15 +434,23 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       // Camera transition
       if (currentSpot.driving_route && currentSpot.driving_route.length > 1) {
         const segBounds = L.latLngBounds(currentSpot.driving_route);
-        map.flyToBounds(segBounds, {
-          padding: [80, 80],
-          maxZoom: 14,
-          duration: 0.9
-        });
+        lastBoundsRef.current = segBounds;
+        lastPointRef.current = null;
+        if (containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
+          map.flyToBounds(segBounds, {
+            padding: window.innerWidth < 600 ? [32, 32] : [80, 80],
+            maxZoom: 14,
+            duration: 0.9
+          });
+        }
       } else {
-        map.flyTo([currentSpot.lat, currentSpot.lng], 13, {
-          duration: 0.9
-        });
+        lastBoundsRef.current = null;
+        lastPointRef.current = [currentSpot.lat, currentSpot.lng];
+        if (containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
+          map.flyTo([currentSpot.lat, currentSpot.lng], 13, {
+            duration: 0.9
+          });
+        }
       }
     }
   }, [allDays, currentDayIndex, currentSpotIndex, viewMode, onSelectSpot, onSelectDay]);

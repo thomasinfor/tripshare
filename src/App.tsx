@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import rawTripData from './data/trips.json';
 import { TripCatalog } from './components/TripCatalog';
 import { TripRaw, NormalizedTrip, MapProvider, MapStyle, ViewMode } from './types';
@@ -143,8 +143,10 @@ const TripViewer: React.FC<TripViewerProps> = ({ trip, onBackToCatalog }) => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [trip]);
 
-  // Lightbox
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [mobileSpotPane, setMobileSpotPane] = useState<'photos' | 'split' | 'map'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 600 ? 'photos' : 'split'
+  );
 
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -339,8 +341,8 @@ const TripViewer: React.FC<TripViewerProps> = ({ trip, onBackToCatalog }) => {
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
-        width: '100vw',
+        height: '100dvh',
+        width: '100%',
         overflow: 'hidden',
         bgcolor: '#f5f2eb',
         color: '#161615',
@@ -366,100 +368,194 @@ const TripViewer: React.FC<TripViewerProps> = ({ trip, onBackToCatalog }) => {
         component="main"
         sx={{
           flex: 1,
+          minHeight: 0,
           display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          height: 'calc(100vh - var(--header-height) - var(--bottom-bar-height))',
+          flexDirection: 'column',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Left Split: Spot Showcase — 58% width on desktop */}
+        {/* Mobile/Tablet Spot View Switcher Bar */}
         {isSplitView && (
           <Box
             sx={{
-              width: { xs: '100%', md: '58%' },
-              maxWidth: { xs: '100%', md: '58%' },
-              height: { xs: '50%', md: '100%' },
+              display: { xs: 'flex', md: 'none' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+              px: 1.5,
+              py: 0.65,
               bgcolor: '#f5f2eb',
-              borderRight: { xs: 'none', md: '1px solid rgba(22, 22, 21, 0.10)' },
-              borderBottom: { xs: '1px solid rgba(22, 22, 21, 0.10)', md: 'none' },
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              position: 'relative',
-              zIndex: 10,
+              borderBottom: '1px solid rgba(22, 22, 21, 0.10)',
+              flexShrink: 0,
+              zIndex: 20,
             }}
           >
-            <SpotShowcase
-              spot={currentSpot}
-              spotNumber={currentSpotIndex + 1}
-              totalSpots={spots.length}
-              dayTitle={currentDay?.title || `Day ${currentDayIndex + 1}`}
-              dayNumber={currentDayIndex + 1}
-              totalDays={trip.days.length}
-              dayDate={currentDay?.date}
-              dayColor={currentDay?.color}
-              distanceFromPrev={currentSpotIndex > 0 ? currentSpot.driving_distance_km : undefined}
-              onOpenLightbox={(img) => setLightboxImage(img)}
-            />
+            <Typography
+              sx={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '10.5px',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                color: '#6b6860',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              STOP {String(currentSpotIndex + 1).padStart(2, '0')} / {String(spots.length).padStart(2, '0')}
+            </Typography>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.4,
+                p: 0.3,
+                borderRadius: '999px',
+                bgcolor: 'rgba(22, 22, 21, 0.05)',
+                border: '1px solid rgba(22, 22, 21, 0.09)',
+              }}
+            >
+              {([
+                { id: 'photos', label: `Photos (${currentSpot.images.length})` },
+                { id: 'split', label: 'Split' },
+                { id: 'map', label: 'Map' },
+              ] as const).map((tab) => {
+                const active = mobileSpotPane === tab.id;
+                return (
+                  <Box
+                    key={tab.id}
+                    component="button"
+                    type="button"
+                    onClick={() => setMobileSpotPane(tab.id)}
+                    sx={{
+                      border: 'none',
+                      cursor: 'pointer',
+                      borderRadius: '999px',
+                      px: 1.2,
+                      py: 0.4,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '10.5px',
+                      fontWeight: 600,
+                      bgcolor: active ? '#161615' : 'transparent',
+                      color: active ? '#f5f2eb' : '#6b6860',
+                      transition: 'background-color 0.15s ease, color 0.15s ease',
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
         )}
 
-        {/* Right Split / Full Map */}
         <Box
           sx={{
             flex: 1,
-            width: isMapFullscreen ? '100%' : { xs: '100%', md: '42%' },
-            height: isSplitView ? { xs: '50%', md: '100%' } : '100%',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
             position: 'relative',
             overflow: 'hidden',
           }}
         >
-          {mapProvider === 'google' ? (
-            <GoogleMapView
-              apiKey={googleApiKey}
-              viewMode={viewMode}
-              allDays={trip.days}
-              currentDayIndex={currentDayIndex}
-              currentSpotIndex={currentSpotIndex}
-              mapStyle={mapStyle}
-              onSelectSpot={handleSelectSpot}
-              onSwitchToLeaflet={() => {
-                setMapProvider('leaflet');
-                localStorage.setItem('tripshare_provider', 'leaflet');
+          {/* Left Split: Spot Showcase — 58% width on desktop */}
+          {isSplitView && (
+            <Box
+              sx={{
+                display: { xs: mobileSpotPane === 'map' ? 'none' : 'flex', md: 'flex' },
+                width: { xs: '100%', md: '58%' },
+                maxWidth: { xs: '100%', md: '58%' },
+                height: { xs: mobileSpotPane === 'photos' ? '100%' : '58%', md: '100%' },
+                minHeight: 0,
+                bgcolor: '#f5f2eb',
+                borderRight: { xs: 'none', md: '1px solid rgba(22, 22, 21, 0.10)' },
+                borderBottom: {
+                  xs: mobileSpotPane === 'split' ? '1px solid rgba(22, 22, 21, 0.10)' : 'none',
+                  md: 'none',
+                },
+                flexDirection: 'column',
+                overflow: 'hidden',
+                position: 'relative',
+                zIndex: 10,
               }}
-              onConfigureKey={() => setIsSettingsOpen(true)}
-            />
-          ) : (
-            <LeafletMap
-              viewMode={viewMode}
-              allDays={trip.days}
-              currentDayIndex={currentDayIndex}
-              currentSpotIndex={currentSpotIndex}
-              mapStyle={mapStyle}
-              onSelectSpot={handleSelectSpot}
-              onSelectDay={handleSelectDay}
-            />
+            >
+              <SpotShowcase
+                spot={currentSpot}
+                spotNumber={currentSpotIndex + 1}
+                totalSpots={spots.length}
+                dayTitle={currentDay?.title || `Day ${currentDayIndex + 1}`}
+                dayNumber={currentDayIndex + 1}
+                totalDays={trip.days.length}
+                dayDate={currentDay?.date}
+                dayColor={currentDay?.color}
+                distanceFromPrev={currentSpotIndex > 0 ? currentSpot.driving_distance_km : undefined}
+                onOpenLightbox={(img) => setLightboxImage(img)}
+              />
+            </Box>
           )}
 
-          {/* Trip Overview Overlay */}
-          {viewMode === 'trip-overview' && (
-            <TripOverviewOverlay
-              trip={trip}
-              onStartExpedition={handleStartExpedition}
-              onSelectDay={handleSelectDay}
-            />
-          )}
+          {/* Right Split / Full Map */}
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: isSplitView
+                ? { xs: mobileSpotPane === 'photos' ? 'none' : 'block', md: 'block' }
+                : 'block',
+              width: isMapFullscreen ? '100%' : { xs: '100%', md: '42%' },
+              height: isSplitView
+                ? { xs: mobileSpotPane === 'map' ? '100%' : '42%', md: '100%' }
+                : '100%',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {mapProvider === 'google' ? (
+              <GoogleMapView
+                apiKey={googleApiKey}
+                viewMode={viewMode}
+                allDays={trip.days}
+                currentDayIndex={currentDayIndex}
+                currentSpotIndex={currentSpotIndex}
+                mapStyle={mapStyle}
+                onSelectSpot={handleSelectSpot}
+                onSwitchToLeaflet={() => {
+                  setMapProvider('leaflet');
+                  localStorage.setItem('tripshare_provider', 'leaflet');
+                }}
+                onConfigureKey={() => setIsSettingsOpen(true)}
+              />
+            ) : (
+              <LeafletMap
+                viewMode={viewMode}
+                allDays={trip.days}
+                currentDayIndex={currentDayIndex}
+                currentSpotIndex={currentSpotIndex}
+                mapStyle={mapStyle}
+                onSelectSpot={handleSelectSpot}
+                onSelectDay={handleSelectDay}
+              />
+            )}
 
-          {/* Day Overview Overlay */}
-          {viewMode === 'day-overview' && currentDay && (
-            <DayOverviewOverlay
-              day={currentDay}
-              dayIndex={currentDayIndex}
-              totalDays={trip.days.length}
-              onStartJourney={handleStartDayJourney}
-            />
-          )}
+            {/* Trip Overview Overlay */}
+            {viewMode === 'trip-overview' && (
+              <TripOverviewOverlay
+                trip={trip}
+                onStartExpedition={handleStartExpedition}
+                onSelectDay={handleSelectDay}
+              />
+            )}
+
+            {/* Day Overview Overlay */}
+            {viewMode === 'day-overview' && currentDay && (
+              <DayOverviewOverlay
+                day={currentDay}
+                dayIndex={currentDayIndex}
+                totalDays={trip.days.length}
+                onStartJourney={handleStartDayJourney}
+              />
+            )}
+          </Box>
         </Box>
       </Box>
 

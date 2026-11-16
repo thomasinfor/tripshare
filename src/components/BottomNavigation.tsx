@@ -116,22 +116,25 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       className="bottom-navigation-bar"
       sx={{
         position: 'relative',
-        height: 'var(--bottom-bar-height)',
+        minHeight: 'var(--bottom-bar-height)',
+        height: 'auto',
         bgcolor: 'rgba(245, 242, 235, 0.95)',
         backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(22, 22, 21, 0.10)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        px: { xs: 1.5, sm: 2.5 },
-        py: 0.75,
+        gap: 0.5,
+        px: { xs: 1.25, sm: 2.5 },
+        pt: 0.75,
+        pb: 'calc(6px + env(safe-area-inset-bottom, 0px))',
         zIndex: 100,
       }}
     >
       {/* Top Controls Row: Day Tabs & Overview Buttons */}
       <Stack
         direction="row"
-        spacing={1.5}
+        spacing={{ xs: 1, sm: 1.5 }}
         sx={{ alignItems: 'center', justifyContent: 'space-between' }}
       >
         {/* Day Tabs - active chip expanded, inactive chips compact */}
@@ -292,21 +295,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </Stack>
 
       {/* Main Scrubber Row (Minimalist Track Beads) */}
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+      <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: 'center' }}>
         {/* Previous Button */}
         <Button
           size="small"
+          aria-label="Previous stop or day"
           onClick={onPrev}
           startIcon={<ArrowBackIcon sx={{ fontSize: 15 }} />}
           sx={{
-            minWidth: { xs: 34, sm: 76 },
-            px: { xs: 0.8, sm: 1.4 },
-            py: 0.35,
+            minWidth: { xs: 36, sm: 76 },
+            px: { xs: 0.9, sm: 1.4 },
+            py: 0.4,
             borderRadius: '999px',
             bgcolor: 'rgba(22, 22, 21, 0.04)',
             border: '1px solid rgba(22, 22, 21, 0.12)',
             color: '#161615',
             fontSize: '11.5px',
+            '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.75 }, ml: { xs: 0, sm: -0.25 } },
             '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
           }}
         >
@@ -321,7 +326,59 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         {/* Timeline Slider Track */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box className="timeline-track-container" sx={{ position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>
+          {/* Compact Mobile Readout Bar when many spots would crowd beads */}
+          {spots.length > 7 && (
+            <Box
+              onClick={onToggleDayOverview}
+              sx={{
+                display: { xs: 'flex', sm: 'none' },
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 0.5,
+                py: 0.25,
+                cursor: 'pointer',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, minWidth: 0 }}>
+                <Typography
+                  noWrap
+                  sx={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: '#161615',
+                    minWidth: 0,
+                  }}
+                >
+                  {viewMode === 'trip-overview'
+                    ? 'All Days Route'
+                    : viewMode === 'day-overview'
+                    ? `Day ${currentDayIndex + 1} Route`
+                    : `Stop ${currentSpotIndex + 1}/${spots.length} · ${spots[currentSpotIndex]?.name || ''}`}
+                </Typography>
+              </Box>
+              <Box sx={{ width: '100%', height: 3, borderRadius: 99, bgcolor: 'rgba(22, 22, 21, 0.14)', overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    width: `${scrubberProgressPercent}%`,
+                    height: '100%',
+                    bgcolor: '#b91c1c',
+                    transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                />
+              </Box>
+            </Box>
+          )}
+
+          <Box
+            className="timeline-track-container"
+            sx={{
+              position: 'relative',
+              height: 28,
+              display: spots.length > 7 ? { xs: 'none', sm: 'flex' } : 'flex',
+              alignItems: 'center',
+            }}
+          >
             {/* Base Rail and Active Progress Fill - aligned to node centers */}
             <Box className="timeline-track-rail">
               <Box
@@ -352,13 +409,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 const isActive = viewMode === 'spot-detail' && currentStep === stepNum;
                 const isPassed = currentStep > stepNum;
                 const isHovered = hoveredSpotIdx === idx;
+                const alignLeft = idx <= 1;
+                const alignRight = idx >= spots.length - 2 && spots.length > 2;
 
                 return (
                   <Box
                     key={spot.id || idx}
                     className={`timeline-node ${isActive ? 'active' : ''} ${isPassed ? 'passed' : ''}`}
                     onClick={() => onSelectSpot(idx)}
-                    onMouseEnter={() => setHoveredSpotIdx(idx)}
+                    onMouseEnter={() => {
+                      if (typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches) {
+                        setHoveredSpotIdx(idx);
+                      }
+                    }}
                     onMouseLeave={() => setHoveredSpotIdx(null)}
                   >
                     <Box className="node-dot">
@@ -370,9 +433,10 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                       <Box
                         sx={{
                           position: 'absolute',
-                          bottom: 30,
-                          left: '50%',
-                          transform: 'translateX(-50%)',
+                          bottom: 34,
+                          left: alignLeft ? 0 : alignRight ? 'auto' : '50%',
+                          right: alignRight ? 0 : 'auto',
+                          transform: alignLeft || alignRight ? 'none' : 'translateX(-50%)',
                           bgcolor: '#ffffff',
                           border: '1px solid rgba(22, 22, 21, 0.12)',
                           borderRadius: '10px',
@@ -380,6 +444,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: 1.2,
+                          maxWidth: 'min(260px, 75vw)',
                           whiteSpace: 'nowrap',
                           boxShadow: '0 12px 28px rgba(22, 22, 21, 0.14)',
                           pointerEvents: 'none',
@@ -392,11 +457,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                             component="img"
                             src={getMediaUrl(spot.images[0], 'thumbnail')}
                             alt={spot.name}
-                            sx={{ width: 42, height: 42, borderRadius: '4px', objectFit: 'cover', bgcolor: '#ebe6dc' }}
+                            sx={{ width: 42, height: 42, borderRadius: '4px', objectFit: 'cover', bgcolor: '#ebe6dc', flexShrink: 0 }}
                           />
                         )}
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, color: '#161615' }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" noWrap sx={{ fontWeight: 600, fontSize: 12, color: '#161615' }}>
                             #{idx + 1} {spot.name}
                           </Typography>
                           <Typography
@@ -423,17 +488,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         {/* Next Button */}
         <Button
           size="small"
+          aria-label="Next stop or day"
           onClick={onNext}
           endIcon={<ArrowForwardIcon sx={{ fontSize: 15 }} />}
           sx={{
-            minWidth: { xs: 34, sm: 76 },
-            px: { xs: 0.8, sm: 1.4 },
-            py: 0.35,
+            minWidth: { xs: 36, sm: 76 },
+            px: { xs: 0.9, sm: 1.4 },
+            py: 0.4,
             borderRadius: '999px',
             bgcolor: 'rgba(22, 22, 21, 0.04)',
             border: '1px solid rgba(22, 22, 21, 0.12)',
             color: '#161615',
             fontSize: '11.5px',
+            '& .MuiButton-endIcon': { ml: { xs: 0, sm: 0.75 }, mr: { xs: 0, sm: -0.25 } },
             '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
           }}
         >
