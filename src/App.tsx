@@ -381,9 +381,16 @@ const TripViewer: React.FC<TripViewerProps> = ({
       // nothing to go back to
     } else if (viewMode === 'day-overview') {
       if (currentDayIndex > 0) {
-        setCurrentDayIndex(prev => prev - 1);
-        setCurrentSpotIndex(0);
-        setViewMode('day-overview');
+        const prevDayIdx = currentDayIndex - 1;
+        const prevDaySpots = effectiveTrip.days[prevDayIdx]?.spots || [];
+        setCurrentDayIndex(prevDayIdx);
+        if (prevDaySpots.length > 0) {
+          setCurrentSpotIndex(prevDaySpots.length - 1);
+          setViewMode('spot-detail');
+        } else {
+          setCurrentSpotIndex(0);
+          setViewMode('day-overview');
+        }
       } else {
         setViewMode('trip-overview');
       }
@@ -395,7 +402,7 @@ const TripViewer: React.FC<TripViewerProps> = ({
         setViewMode('day-overview');
       }
     }
-  }, [viewMode, currentDayIndex, currentSpotIndex]);
+  }, [viewMode, currentDayIndex, currentSpotIndex, effectiveTrip.days]);
 
   const handleNext = useCallback(() => {
     if (viewMode === 'trip-overview') {
@@ -403,33 +410,97 @@ const TripViewer: React.FC<TripViewerProps> = ({
       setCurrentSpotIndex(0);
       setViewMode('day-overview');
     } else if (viewMode === 'day-overview') {
-      setCurrentSpotIndex(0);
-      setViewMode('spot-detail');
+      if (spots.length > 0) {
+        setCurrentSpotIndex(0);
+        setViewMode('spot-detail');
+      } else if (currentDayIndex < effectiveTrip.days.length - 1) {
+        setCurrentDayIndex(prev => prev + 1);
+        setCurrentSpotIndex(0);
+        setViewMode('day-overview');
+      }
     } else {
       // spot-detail
       if (currentSpotIndex < spots.length - 1) {
         setCurrentSpotIndex(prev => prev + 1);
-      } else if (currentDayIndex < trip.days.length - 1) {
+      } else if (currentDayIndex < effectiveTrip.days.length - 1) {
         setCurrentDayIndex(prev => prev + 1);
         setCurrentSpotIndex(0);
         setViewMode('day-overview');
       }
     }
-  }, [viewMode, currentSpotIndex, spots.length, currentDayIndex, trip.days.length]);
+  }, [viewMode, currentSpotIndex, spots.length, currentDayIndex, effectiveTrip.days.length]);
+
+  const handlePrevDate = useCallback(() => {
+    if (viewMode === 'trip-overview') return;
+    if (currentDayIndex > 0) {
+      setCurrentDayIndex(prev => prev - 1);
+      setCurrentSpotIndex(0);
+      setViewMode('day-overview');
+    } else {
+      setViewMode('trip-overview');
+    }
+  }, [viewMode, currentDayIndex]);
+
+  const handleNextDate = useCallback(() => {
+    if (viewMode === 'trip-overview') {
+      if (effectiveTrip.days.length > 0) {
+        setCurrentDayIndex(0);
+        setCurrentSpotIndex(0);
+        setViewMode('day-overview');
+      }
+      return;
+    }
+    if (currentDayIndex < effectiveTrip.days.length - 1) {
+      setCurrentDayIndex(prev => prev + 1);
+      setCurrentSpotIndex(0);
+      setViewMode('day-overview');
+    }
+  }, [viewMode, currentDayIndex, effectiveTrip.days.length]);
 
   // Global Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
       if (lightboxImage || isSettingsOpen || isModalOverlayOpen) return;
-      if (e.key === 'ArrowLeft') handlePrev();
-      else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); handleNext(); }
-      else if (e.key === 'm' || e.key === 'M') handleToggleDayOverview();
-      else if (e.key === 'Escape' && viewMode !== 'trip-overview') handleOpenTripOverview();
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
+      } else if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        handlePrevDate();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        handleNextDate();
+      } else if (e.key === 'm' || e.key === 'M') {
+        handleToggleDayOverview();
+      } else if (e.key === 'Escape' && viewMode !== 'trip-overview') {
+        handleOpenTripOverview();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePrev, handleNext, lightboxImage, isSettingsOpen, isModalOverlayOpen, viewMode]);
+  }, [
+    handlePrev,
+    handleNext,
+    handlePrevDate,
+    handleNextDate,
+    handleToggleDayOverview,
+    handleOpenTripOverview,
+    lightboxImage,
+    isSettingsOpen,
+    isModalOverlayOpen,
+    viewMode,
+  ]);
 
   const isSplitView = viewMode === 'spot-detail' && !!displaySpot;
   const isMapFullscreen = viewMode === 'trip-overview' || viewMode === 'day-overview';

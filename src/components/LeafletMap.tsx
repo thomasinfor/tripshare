@@ -126,6 +126,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       center: [initialSpot.lat, initialSpot.lng],
       zoom: 10,
       zoomControl: false,
+      keyboard: false,
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);

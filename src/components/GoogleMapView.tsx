@@ -323,6 +323,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           mapId="DEMO_MAP_ID"
           colorScheme={colorScheme}
           gestureHandling="greedy"
+          keyboardShortcuts={false}
           disableDefaultUI={false}
           mapTypeControl={false}
           streetViewControl={false}

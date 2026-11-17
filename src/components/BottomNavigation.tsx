@@ -319,7 +319,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             {viewMode === 'trip-overview'
               ? 'Prev'
               : viewMode === 'day-overview'
-              ? (currentDayIndex === 0 ? 'Trip Map' : 'Prev Day')
+              ? (currentDayIndex === 0 ? 'Trip Map' : 'Prev Spot')
               : (currentSpotIndex === 0 ? 'Day Route' : 'Prev')}
           </Box>
         </Button>
