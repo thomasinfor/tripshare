@@ -1,7 +1,75 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { Spot, ItineraryDay, MapStyle, ViewMode } from '../types';
-import { getDistinctDayColor } from '../utils/geo';
+import { Accommodation, Spot, ItineraryDay, MapStyle, ViewMode } from '../types';
+import { getDistinctDayColor, calculateDistanceKm } from '../utils/geo';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getOriginIconSvg(isLastNightOrigin: boolean): string {
+  if (isLastNightOrigin) {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  }
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>';
+}
+
+function addOriginAccommodationMarker(params: {
+  startAcc: Accommodation;
+  isLastNightOrigin: boolean;
+  isRouteOrigin: boolean;
+  showLabel: boolean;
+  dayIndex: number;
+  onSelectSpot: (dayIndex: number, spotIndex: number) => void;
+  markersGroup: L.LayerGroup;
+}) {
+  const { startAcc, isLastNightOrigin, isRouteOrigin, showLabel, dayIndex, onSelectSpot, markersGroup } = params;
+  const originTitlePrefix = isLastNightOrigin ? "Last Night's Stay" : 'Day Start';
+  const shortOriginPrefix = isLastNightOrigin ? 'Last Night' : 'Start';
+
+  const markerHtml = `
+    <div class="custom-map-marker is-accommodation${isRouteOrigin ? ' is-route-origin' : ''}">
+      <div class="marker-badge">${getOriginIconSvg(isLastNightOrigin)}</div>
+      ${showLabel ? `<div class="marker-label">${escapeHtml(shortOriginPrefix)}: ${escapeHtml(startAcc.name)}</div>` : ''}
+    </div>
+  `;
+
+  const customIcon = L.divIcon({
+    className: 'custom-leaflet-marker-wrap',
+    html: markerHtml,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+
+  const marker = L.marker([startAcc.lat, startAcc.lng], {
+    icon: customIcon,
+    zIndexOffset: isRouteOrigin ? 400 : 50,
+  });
+  marker.on('click', () => {
+    onSelectSpot(dayIndex, 0);
+  });
+  marker.bindTooltip(
+    `
+      <div class="leaflet-tooltip-card">
+        <div class="tooltip-num" style="color: #161615">${escapeHtml(originTitlePrefix)}</div>
+        <div class="tooltip-title">${escapeHtml(startAcc.name)}</div>
+        <div class="tooltip-meta">Departure → Spot 1</div>
+      </div>
+    `,
+    {
+      direction: 'top',
+      offset: [0, -18],
+      opacity: 0.96,
+      className: 'custom-tooltip-popup',
+    }
+  );
+  marker.addTo(markersGroup);
+}
 
 interface LeafletMapProps {
   viewMode: ViewMode;
@@ -264,6 +332,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     // 2. DAY OVERVIEW MODE: Render current day's driving route
     // =========================================================================
     const dayColor = currentDay.color || getDistinctDayColor(currentDayIndex);
+    const startAcc = currentDay?.start_accommodation;
+    const isLastNightOrigin = currentDayIndex > 0;
+    const originTitlePrefix = isLastNightOrigin ? "Last Night's Stay" : 'Day Start';
+    const shortOriginPrefix = isLastNightOrigin ? 'Last Night' : 'Start';
+    const overlappingSpotIdx = startAcc
+      ? currentSpots.findIndex(
+          (s) => calculateDistanceKm(s.lat, s.lng, startAcc.lat, startAcc.lng) < 0.06
+        )
+      : -1;
 
     if (viewMode === 'day-overview') {
       const drivingPts = currentDay.driving_route && currentDay.driving_route.length > 1
@@ -290,13 +367,27 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         }).addTo(routeGroup);
       }
 
+      if (startAcc && overlappingSpotIdx === -1) {
+        addOriginAccommodationMarker({
+          startAcc,
+          isLastNightOrigin,
+          isRouteOrigin: false,
+          showLabel: false,
+          dayIndex: currentDayIndex,
+          onSelectSpot,
+          markersGroup,
+        });
+      }
+
       currentSpots.forEach((spot, sIdx) => {
+        const tooltipNumLabel =
+          sIdx === overlappingSpotIdx ? `${originTitlePrefix} & Spot ${sIdx + 1}` : `Spot ${sIdx + 1}`;
         const markerHtml = `
           <div class="custom-map-marker is-overview">
             <div class="marker-badge" style="background: #ffffff; border-color: ${dayColor}; color: #161615;">
               <span class="marker-num">${sIdx + 1}</span>
             </div>
-            <div class="marker-label">${spot.name}</div>
+            <div class="marker-label">${escapeHtml(spot.name)}</div>
           </div>
         `;
 
@@ -315,9 +406,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
         marker.bindTooltip(`
           <div class="leaflet-tooltip-card">
-            <div class="tooltip-num" style="color: ${dayColor}">Spot ${sIdx + 1}</div>
-            <div class="tooltip-title">${spot.name}</div>
-            <div class="tooltip-meta">${spot.images.length} photos ${spot.time ? `• ${spot.time}` : ''}</div>
+            <div class="tooltip-num" style="color: ${dayColor}">${escapeHtml(tooltipNumLabel)}</div>
+            <div class="tooltip-title">${escapeHtml(spot.name)}</div>
+            <div class="tooltip-meta">${spot.images.length} photos ${spot.time ? `• ${escapeHtml(spot.time)}` : ''}</div>
           </div>
         `, {
           direction: 'top',
@@ -330,6 +421,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       });
 
       const dayBoundsCoords: [number, number][] = currentSpots.map(s => [s.lat, s.lng]);
+      if (startAcc) {
+        dayBoundsCoords.push([startAcc.lat, startAcc.lng]);
+      }
       if (drivingPts) {
         drivingPts.forEach(pt => dayBoundsCoords.push(pt));
       }
@@ -387,10 +481,26 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         }).addTo(routeGroup);
       }
 
+      if (startAcc && overlappingSpotIdx === -1) {
+        addOriginAccommodationMarker({
+          startAcc,
+          isLastNightOrigin,
+          isRouteOrigin: currentSpotIndex === 0,
+          showLabel: currentSpotIndex === 0,
+          dayIndex: currentDayIndex,
+          onSelectSpot,
+          markersGroup,
+        });
+      }
+
       // 3C. Add Markers for spots in the day
       currentSpots.forEach((spot, idx) => {
         const isCurrent = idx === currentSpotIndex;
         const spotNum = idx + 1;
+        const isOverlapOrigin = idx === overlappingSpotIdx;
+        const showOriginLabel =
+          currentSpotIndex === 0 && isOverlapOrigin && overlappingSpotIdx !== 0 && Boolean(startAcc);
+        const tooltipNumLabel = isOverlapOrigin ? `${originTitlePrefix} & Spot ${spotNum}` : `Spot ${spotNum}`;
 
         const markerHtml = `
           <div class="custom-map-marker ${isCurrent ? 'is-active' : ''}">
@@ -398,7 +508,13 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
             <div class="marker-badge">
               <span class="marker-num">${spotNum}</span>
             </div>
-            ${isCurrent ? `<div class="marker-label">${spot.name}</div>` : ''}
+            ${
+              isCurrent
+                ? `<div class="marker-label">${escapeHtml(spot.name)}</div>`
+                : showOriginLabel && startAcc
+                  ? `<div class="marker-label">${escapeHtml(shortOriginPrefix)}: ${escapeHtml(startAcc.name)}</div>`
+                  : ''
+            }
           </div>
         `;
 
@@ -417,9 +533,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
         marker.bindTooltip(`
           <div class="leaflet-tooltip-card">
-            <div class="tooltip-num">Spot ${spotNum}</div>
-            <div class="tooltip-title">${spot.name}</div>
-            <div class="tooltip-meta">${spot.images.length} photos ${spot.time ? `• ${spot.time}` : ''}</div>
+            <div class="tooltip-num">${escapeHtml(tooltipNumLabel)}</div>
+            <div class="tooltip-title">${escapeHtml(spot.name)}</div>
+            <div class="tooltip-meta">${spot.images.length} photos ${spot.time ? `• ${escapeHtml(spot.time)}` : ''}</div>
           </div>
         `, {
           direction: 'top',
@@ -434,6 +550,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       // Camera transition
       if (currentSpot.driving_route && currentSpot.driving_route.length > 1) {
         const segBounds = L.latLngBounds(currentSpot.driving_route);
+        if (currentSpotIndex === 0 && startAcc) {
+          segBounds.extend([startAcc.lat, startAcc.lng]);
+        }
         lastBoundsRef.current = segBounds;
         lastPointRef.current = null;
         if (containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {

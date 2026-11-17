@@ -5,18 +5,26 @@ import {
   Box,
   Typography,
   IconButton,
+  Button,
+  Chip,
   Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import UndoIcon from '@mui/icons-material/Undo';
 import { getMediaUrl, scheduleMediaPrefetch, isMediaDecoded, markMediaDecoded } from '../utils/media';
 
 interface LightboxModalProps {
   images: string[];
   currentImage: string;
   spotName: string;
+  isEditMode?: boolean;
+  isPhotoRemoved?: (assetId: string) => boolean;
+  isPhotoAdded?: (assetId: string) => boolean;
+  onToggleRemovePhoto?: (assetId: string) => void;
   onClose: () => void;
   onSelectImage: (imageUrl: string) => void;
 }
@@ -25,6 +33,10 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
   images,
   currentImage,
   spotName,
+  isEditMode = false,
+  isPhotoRemoved,
+  isPhotoAdded,
+  onToggleRemovePhoto,
   onClose,
   onSelectImage,
 }) => {
@@ -159,6 +171,58 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+            {import.meta.env.DEV && isEditMode && onToggleRemovePhoto && (
+              <>
+                {isPhotoAdded?.(currentImage) && (
+                  <Chip
+                    label="ADDED"
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      bgcolor: '#15803d',
+                      color: '#ffffff',
+                      display: { xs: 'none', sm: 'inline-flex' },
+                    }}
+                  />
+                )}
+                <Button
+                  size="small"
+                  variant={isPhotoRemoved?.(currentImage) ? 'contained' : 'outlined'}
+                  onClick={() => onToggleRemovePhoto(currentImage)}
+                  startIcon={
+                    isPhotoRemoved?.(currentImage) ? (
+                      <UndoIcon sx={{ fontSize: '15px !important' }} />
+                    ) : (
+                      <DeleteOutlineIcon sx={{ fontSize: '15px !important' }} />
+                    )
+                  }
+                  sx={{
+                    borderRadius: '999px',
+                    py: 0.35,
+                    px: { xs: 1, sm: 1.4 },
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    ...(isPhotoRemoved?.(currentImage)
+                      ? { bgcolor: '#161615', color: '#f5f2eb', '&:hover': { bgcolor: '#2c2c2a' } }
+                      : {
+                          borderColor: 'rgba(185, 28, 28, 0.45)',
+                          color: '#b91c1c',
+                          '&:hover': { bgcolor: 'rgba(185, 28, 28, 0.08)', borderColor: '#b91c1c' },
+                        }),
+                  }}
+                >
+                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                    {isPhotoRemoved?.(currentImage) ? 'Undo Remove' : 'Remove from Spot'}
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                    {isPhotoRemoved?.(currentImage) ? 'Undo' : 'Remove'}
+                  </Box>
+                </Button>
+              </>
+            )}
             <Tooltip title="Download original photo">
               <IconButton
                 component="a"

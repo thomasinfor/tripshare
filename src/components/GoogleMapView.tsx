@@ -2,8 +2,8 @@ import React, { useEffect, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { Box, Typography, Button } from '@mui/material';
 import { ItineraryDay, MapStyle, ViewMode } from '../types';
-import { getDistinctDayColor } from '../utils/geo';
-import { KeyRound, Sparkles } from 'lucide-react';
+import { getDistinctDayColor, calculateDistanceKm } from '../utils/geo';
+import { KeyRound, Sparkles, Home, Flag } from 'lucide-react';
 
 interface GoogleMapViewProps {
   apiKey: string;
@@ -55,6 +55,7 @@ const GoogleMapRouteController: React.FC<{
     const currentDay = allDays[currentDayIndex] || allDays[0];
     const currentSpots = currentDay?.spots || [];
     const currentSpot = currentSpots[currentSpotIndex];
+    const startAcc = currentDay?.start_accommodation;
     let activeBounds: google.maps.LatLngBounds | null = null;
 
     if (viewMode === 'trip-overview') {
@@ -119,6 +120,9 @@ const GoogleMapRouteController: React.FC<{
         polylines.push(halo, line);
       }
       currentSpots.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
+      if (startAcc) {
+        bounds.extend({ lat: startAcc.lat, lng: startAcc.lng });
+      }
 
       activeBounds = bounds;
     } else if (viewMode === 'spot-detail' && currentSpot) {
@@ -161,6 +165,9 @@ const GoogleMapRouteController: React.FC<{
         const bounds = new google.maps.LatLngBounds();
         segPts.forEach(pt => bounds.extend(pt));
         bounds.extend({ lat: currentSpot.lat, lng: currentSpot.lng });
+        if (currentSpotIndex === 0 && startAcc) {
+          bounds.extend({ lat: startAcc.lat, lng: startAcc.lng });
+        }
         activeBounds = bounds;
       }
     }
@@ -391,50 +398,107 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               })
             )
           ) : (
-            currentSpots.map((spot, idx) => {
-              const isCurrent = viewMode === 'spot-detail' && idx === currentSpotIndex;
-              const inactiveBorder =
-                viewMode === 'day-overview'
-                  ? (currentDay.color || '#161615')
-                  : '#b91c1c';
-              const size = isCurrent ? 30 : 22;
+            (() => {
+              const startAcc = currentDay?.start_accommodation;
+              const isLastNightOrigin = currentDayIndex > 0;
+              const originTitlePrefix = isLastNightOrigin ? "Last Night's Stay" : 'Day Start';
+              const shortOriginPrefix = isLastNightOrigin ? 'Last Night' : 'Start';
+              const overlappingSpotIdx = startAcc
+                ? currentSpots.findIndex(
+                    (s) => calculateDistanceKm(s.lat, s.lng, startAcc.lat, startAcc.lng) < 0.06
+                  )
+                : -1;
+              const isOriginHighlighted = viewMode === 'spot-detail' && currentSpotIndex === 0;
 
               return (
-                <AdvancedMarker
-                  key={spot.id || idx}
-                  position={{ lat: spot.lat, lng: spot.lng }}
-                  onClick={() => onSelectSpot(currentDayIndex, idx)}
-                  title={`${idx + 1}. ${spot.name}`}
-                  zIndex={isCurrent ? 500 : 10}
-                >
-                  <div
-                    style={{
-                      width: size,
-                      height: size,
-                      borderRadius: '50%',
-                      background: isCurrent ? '#b91c1c' : '#ffffff',
-                      border: `2px solid ${isCurrent ? '#ffffff' : inactiveBorder}`,
-                      color: isCurrent ? '#ffffff' : '#161615',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontWeight: 700,
-                      fontSize: isCurrent ? '12px' : '10px',
-                      lineHeight: 1,
-                      boxShadow: isCurrent
-                        ? '0 4px 12px rgba(22, 22, 21, 0.35)'
-                        : '0 2px 8px rgba(22, 22, 21, 0.2)',
-                      cursor: 'pointer',
-                      transform: 'translateY(50%)',
-                      userSelect: 'none',
-                    }}
-                  >
-                    {idx + 1}
-                  </div>
-                </AdvancedMarker>
+                <>
+                  {startAcc && overlappingSpotIdx === -1 && (
+                    <AdvancedMarker
+                      key={`origin-${currentDayIndex}-${startAcc.name}`}
+                      position={{ lat: startAcc.lat, lng: startAcc.lng }}
+                      onClick={() => onSelectSpot(currentDayIndex, 0)}
+                      title={`${originTitlePrefix}: ${startAcc.name} (Departure → Spot 1)`}
+                      zIndex={isOriginHighlighted ? 450 : 20}
+                    >
+                      <div
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: '7px',
+                          background: isOriginHighlighted ? '#161615' : '#ffffff',
+                          border: `2px solid ${isOriginHighlighted ? '#ffffff' : '#161615'}`,
+                          color: isOriginHighlighted ? '#f5f2eb' : '#161615',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: isOriginHighlighted
+                            ? '0 4px 14px rgba(22, 22, 21, 0.32)'
+                            : '0 2px 8px rgba(22, 22, 21, 0.22)',
+                          cursor: 'pointer',
+                          transform: 'translateY(50%)',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {isLastNightOrigin ? (
+                          <Home size={13} strokeWidth={2.2} />
+                        ) : (
+                          <Flag size={13} strokeWidth={2.2} />
+                        )}
+                      </div>
+                    </AdvancedMarker>
+                  )}
+
+                  {currentSpots.map((spot, idx) => {
+                    const isCurrent = viewMode === 'spot-detail' && idx === currentSpotIndex;
+                    const inactiveBorder =
+                      viewMode === 'day-overview'
+                        ? (currentDay.color || '#161615')
+                        : '#b91c1c';
+                    const size = isCurrent ? 30 : 22;
+                    const markerTitle =
+                      idx === overlappingSpotIdx && startAcc
+                        ? `${originTitlePrefix} & Spot ${idx + 1}: ${spot.name} (${shortOriginPrefix}: ${startAcc.name})`
+                        : `${idx + 1}. ${spot.name}`;
+
+                    return (
+                      <AdvancedMarker
+                        key={spot.id || idx}
+                        position={{ lat: spot.lat, lng: spot.lng }}
+                        onClick={() => onSelectSpot(currentDayIndex, idx)}
+                        title={markerTitle}
+                        zIndex={isCurrent ? 500 : 10}
+                      >
+                        <div
+                          style={{
+                            width: size,
+                            height: size,
+                            borderRadius: '50%',
+                            background: isCurrent ? '#b91c1c' : '#ffffff',
+                            border: `2px solid ${isCurrent ? '#ffffff' : inactiveBorder}`,
+                            color: isCurrent ? '#ffffff' : '#161615',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontWeight: 700,
+                            fontSize: isCurrent ? '12px' : '10px',
+                            lineHeight: 1,
+                            boxShadow: isCurrent
+                              ? '0 4px 12px rgba(22, 22, 21, 0.35)'
+                              : '0 2px 8px rgba(22, 22, 21, 0.2)',
+                            cursor: 'pointer',
+                            transform: 'translateY(50%)',
+                            userSelect: 'none',
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
+                      </AdvancedMarker>
+                    );
+                  })}
+                </>
               );
-            })
+            })()
           )}
         </Map>
       </APIProvider>

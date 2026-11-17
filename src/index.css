@@ -78,6 +78,22 @@ html, body, #root {
   box-shadow: 0 4px 14px rgba(185, 28, 28, 0.35);
 }
 
+.custom-map-marker.is-accommodation .marker-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #ffffff;
+  border: 2px solid #161615;
+  color: #161615;
+}
+
+.custom-map-marker.is-accommodation.is-route-origin .marker-badge {
+  background: #161615;
+  border: 2px solid #ffffff;
+  color: #f5f2eb;
+  box-shadow: 0 4px 14px rgba(22, 22, 21, 0.32);
+}
+
 .marker-pulse {
   position: absolute;
   top: 50%;

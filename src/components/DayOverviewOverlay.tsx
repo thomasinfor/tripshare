@@ -313,6 +313,68 @@ export const DayOverviewOverlay: React.FC<DayOverviewOverlayProps> = ({
               },
             }}
           >
+            {day.start_accommodation && (
+              <Box
+                onClick={() => onStartJourney(0)}
+                sx={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.2,
+                  pl: 2.5,
+                  pr: 1,
+                  py: { xs: 0.55, md: 0.7 },
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'background-color 0.16s ease',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 7,
+                    top: '50%',
+                    bottom: 0,
+                    width: '1px',
+                    bgcolor: 'rgba(22, 22, 21, 0.12)',
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 3.5,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '2px',
+                    bgcolor: '#161615',
+                  },
+                  '&:hover': {
+                    bgcolor: 'rgba(22, 22, 21, 0.04)',
+                  },
+                }}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.07em',
+                      color: '#6b6860',
+                      display: 'block',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {dayIndex > 0 ? "Last night's stay" : 'Departure'}
+                  </Typography>
+                  <Typography variant="body2" noWrap sx={{ color: '#161615', fontWeight: 600, fontSize: 12.5 }}>
+                    {day.start_accommodation.name}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
             {day.spots.map((spot, idx) => (
               <Box
                 key={spot.id || idx}

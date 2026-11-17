@@ -15,6 +15,7 @@ import MapIcon from '@mui/icons-material/Map';
 import LayersIcon from '@mui/icons-material/Layers';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { getTripMonogram } from '../utils/geo';
 
 interface HeaderProps {
@@ -23,6 +24,10 @@ interface HeaderProps {
   viewMode: ViewMode;
   mapProvider: MapProvider;
   mapStyle: MapStyle;
+  isPhotoEditMode?: boolean;
+  pendingPhotoChangeCount?: number;
+  onTogglePhotoEditMode?: () => void;
+  onOpenPhotoDraftReview?: () => void;
   onBackToCatalog: () => void;
   onOpenTripOverview: () => void;
   onToggleDayOverview: () => void;
@@ -35,6 +40,10 @@ export const Header: React.FC<HeaderProps> = ({
   currentDayTitle,
   viewMode,
   mapStyle,
+  isPhotoEditMode = false,
+  pendingPhotoChangeCount = 0,
+  onTogglePhotoEditMode,
+  onOpenPhotoDraftReview,
   onBackToCatalog,
   onOpenTripOverview,
   onToggleDayOverview,
@@ -198,6 +207,83 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Controls */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.6, sm: 0.9 }, flexShrink: 0 }}>
+          {import.meta.env.DEV && pendingPhotoChangeCount > 0 && onOpenPhotoDraftReview && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onOpenPhotoDraftReview}
+              sx={{
+                borderRadius: '999px',
+                py: 0.4,
+                px: { xs: 1, sm: 1.35 },
+                minWidth: 0,
+                fontSize: { xs: '11px', sm: '11.5px' },
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                borderColor: '#b91c1c',
+                color: '#b91c1c',
+                bgcolor: 'rgba(185, 28, 28, 0.08)',
+                '&:hover': {
+                  borderColor: '#991b1b',
+                  bgcolor: 'rgba(185, 28, 28, 0.14)',
+                },
+              }}
+            >
+              Drafts ({pendingPhotoChangeCount})
+            </Button>
+          )}
+
+          {import.meta.env.DEV && onTogglePhotoEditMode && (
+            <>
+              <Tooltip title={isPhotoEditMode ? 'Exit Photo Edit Mode' : 'Stage Photo Edits (Dev Only)'} arrow>
+                <IconButton
+                  size="small"
+                  aria-label="Edit Photos"
+                  onClick={onTogglePhotoEditMode}
+                  sx={{
+                    display: { xs: 'inline-flex', sm: 'none' },
+                    bgcolor: isPhotoEditMode ? '#b91c1c' : 'rgba(22, 22, 21, 0.04)',
+                    border: '1px solid',
+                    borderColor: isPhotoEditMode ? '#b91c1c' : 'rgba(22, 22, 21, 0.12)',
+                    color: isPhotoEditMode ? '#ffffff' : '#161615',
+                    '&:hover': {
+                      bgcolor: isPhotoEditMode ? '#991b1b' : 'rgba(22, 22, 21, 0.08)',
+                    },
+                  }}
+                >
+                  <PhotoLibraryIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Button
+                size="small"
+                variant={isPhotoEditMode ? 'contained' : 'outlined'}
+                onClick={onTogglePhotoEditMode}
+                startIcon={<PhotoLibraryIcon sx={{ fontSize: 15 }} />}
+                sx={{
+                  borderRadius: '999px',
+                  py: 0.45,
+                  px: 1.4,
+                  fontSize: '12px',
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  ...(isPhotoEditMode
+                    ? {
+                        bgcolor: '#b91c1c',
+                        color: '#ffffff',
+                        borderColor: '#b91c1c',
+                        '&:hover': { bgcolor: '#991b1b' },
+                      }
+                    : {
+                        borderColor: 'rgba(22, 22, 21, 0.15)',
+                        color: '#161615',
+                      }),
+                }}
+              >
+                {isPhotoEditMode ? 'Editing Photos' : 'Edit Photos'}
+              </Button>
+            </>
+          )}
+
           <Tooltip title="Trip Overview" arrow>
             <IconButton
               size="small"
