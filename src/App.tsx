@@ -4,7 +4,12 @@ import rawTripData from './data/trips.json';
 import { TripCatalog } from './components/TripCatalog';
 import { TripRaw, NormalizedTrip, MapProvider, MapStyle, ViewMode } from './types';
 import { normalizeTrips } from './utils/geo';
-import { getMediaUrl, scheduleMediaPrefetch } from './utils/media';
+import {
+  getMediaUrl,
+  scheduleMediaPrefetch,
+  fetchInitialMediaMeta,
+  ensureMediaMetaForIds,
+} from './utils/media';
 import { Header } from './components/Header';
 import { LeafletMap } from './components/LeafletMap';
 import { GoogleMapView } from './components/GoogleMapView';
@@ -897,6 +902,10 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    void fetchInitialMediaMeta();
+  }, []);
+
+  useEffect(() => {
     if (!import.meta.env.DEV) return;
     setDraftHistory((hist) => ({
       ...hist,
@@ -907,6 +916,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     savePhotoDrafts(photoDrafts);
+    const stagedAddedIds = Object.values(photoDrafts).flatMap((d) => d.addedIds || []);
+    if (stagedAddedIds.length > 0) {
+      void ensureMediaMetaForIds(stagedAddedIds);
+    }
   }, [photoDrafts]);
 
   const commitDraftChange = useCallback(

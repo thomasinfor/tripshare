@@ -68,13 +68,193 @@ const isHttps = immichUrl.startsWith('https:');
 
 const distRoot = path.resolve(rootDir, 'dist');
 const cacheRoot = path.resolve(rootDir, '.cache', 'media');
+const metaCacheFile = path.join(cacheRoot, 'asset-meta.json');
 
 const keepAliveAgent = isHttps
   ? new https.Agent({ keepAlive: true, maxSockets: 32, keepAliveMsecs: 30000 })
   : new http.Agent({ keepAlive: true, maxSockets: 32, keepAliveMsecs: 30000 });
 
 const inFlight = new Map();
+const assetMetaCache = new Map();
+const metaInFlight = new Map();
+let metaLoadPromise = null;
+let metaSaveTimer = null;
 let stopped = false;
+
+function parseImmichDurationMs(raw) {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    return Math.round(raw);
+  }
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    return Number.isFinite(num) && num > 0 ? Math.round(num) : undefined;
+  }
+  const parts = trimmed.split(':').map((p) => Number(p));
+  if (parts.some((n) => !Number.isFinite(n))) return undefined;
+  let seconds = 0;
+  if (parts.length === 3) {
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    seconds = parts[0] * 60 + parts[1];
+  } else {
+    return undefined;
+  }
+  return seconds > 0 ? Math.round(seconds * 1000) : undefined;
+}
+
+function addTripIdsFromSource(parsed, ids) {
+  const trips = Array.isArray(parsed) ? parsed : [parsed];
+  for (const t of trips) {
+    if (t?.cover_image && VALID_ID_RE.test(t.cover_image)) ids.add(t.cover_image);
+    for (const d of t?.itinerary || []) {
+      for (const s of d?.spots || []) {
+        for (const imgId of s?.images || []) {
+          if (VALID_ID_RE.test(imgId)) ids.add(imgId);
+        }
+      }
+    }
+  }
+}
+
+async function collectTripAssetIds() {
+  const ids = new Set();
+  const rawJson = await fs.readFile(path.join(rootDir, 'src/data/trips.json'), 'utf8');
+  addTripIdsFromSource(JSON.parse(rawJson), ids);
+
+  try {
+    const tripsDir = path.join(rootDir, 'src/data/trips');
+    const entries = await fs.readdir(tripsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.json')) {
+        const extraRaw = await fs.readFile(path.join(tripsDir, entry.name), 'utf8');
+        addTripIdsFromSource(JSON.parse(extraRaw), ids);
+      }
+    }
+  } catch {
+    // Optional src/data/trips directory may not exist
+  }
+
+  return Array.from(ids);
+}
+
+function loadAssetMetaOnce() {
+  if (!metaLoadPromise) {
+    metaLoadPromise = (async () => {
+      try {
+        const raw = await fs.readFile(metaCacheFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          for (const [id, rec] of Object.entries(parsed)) {
+            if (VALID_ID_RE.test(id) && rec && (rec.type === 'IMAGE' || rec.type === 'VIDEO')) {
+              assetMetaCache.set(id, rec);
+            }
+          }
+        }
+      } catch {
+        // Cache file may not exist yet
+      }
+    })();
+  }
+  return metaLoadPromise;
+}
+
+function scheduleSaveAssetMeta() {
+  if (metaSaveTimer !== null) {
+    clearTimeout(metaSaveTimer);
+  }
+  metaSaveTimer = setTimeout(async () => {
+    metaSaveTimer = null;
+    try {
+      await fs.mkdir(cacheRoot, { recursive: true });
+      const payload = JSON.stringify(Object.fromEntries(assetMetaCache.entries()));
+      const tmpFile = `${metaCacheFile}.${process.pid}.${Date.now()}.tmp`;
+      await fs.writeFile(tmpFile, payload, 'utf8');
+      await fs.rename(tmpFile, metaCacheFile);
+    } catch {
+      // Ignore metadata disk cache write errors
+    }
+  }, 400);
+  metaSaveTimer.unref?.();
+}
+
+function fetchAssetMeta(assetId) {
+  const cached = assetMetaCache.get(assetId);
+  if (cached) return Promise.resolve(cached);
+
+  const existing = metaInFlight.get(assetId);
+  if (existing) return existing;
+
+  const job = new Promise((resolve) => {
+    const url = new URL(`/api/assets/${assetId}`, immichUrl);
+    const client = isHttps ? https : http;
+    const req = client.request(
+      url,
+      {
+        method: 'GET',
+        agent: keepAliveAgent,
+        headers: {
+          'x-api-key': immichKey,
+          accept: 'application/json',
+        },
+      },
+      (res) => {
+        if (!res.statusCode || res.statusCode >= 400) {
+          res.resume();
+          resolve(null);
+          return;
+        }
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            const durationMs = parseImmichDurationMs(data?.duration);
+            const mime = typeof data?.originalMimeType === 'string' ? data.originalMimeType : undefined;
+            const rec = {
+              type: data?.type === 'VIDEO' ? 'VIDEO' : 'IMAGE',
+              ...(durationMs !== undefined ? { durationMs } : {}),
+              ...(mime ? { mime } : {}),
+            };
+            assetMetaCache.set(assetId, rec);
+            scheduleSaveAssetMeta();
+            resolve(rec);
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', () => resolve(null));
+    req.end();
+  }).finally(() => {
+    metaInFlight.delete(assetId);
+  });
+
+  metaInFlight.set(assetId, job);
+  return job;
+}
+
+async function ensureAssetsMeta(assetIds) {
+  await loadAssetMetaOnce();
+  const missing = Array.from(new Set(assetIds)).filter(
+    (id) => VALID_ID_RE.test(id) && !assetMetaCache.has(id)
+  );
+  if (missing.length === 0) return;
+
+  const queue = [...missing];
+  const workerCount = Math.min(16, queue.length);
+  const worker = async () => {
+    while (!stopped && queue.length > 0) {
+      const id = queue.shift();
+      if (!id) break;
+      await fetchAssetMeta(id);
+    }
+  };
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
 
 function fetchImmichBuffer(targetPath) {
   return new Promise((resolve, reject) => {
@@ -183,47 +363,133 @@ async function getOptimizedTier(assetId, tier) {
   }
 }
 
-function streamOriginal(assetId, req, res) {
-  const immichReqUrl = new URL(`/api/assets/${assetId}/original`, immichUrl);
+function streamImmichMedia(targetPath, defaultContentType, req, res, fallbackPath) {
   const client = isHttps ? https : http;
-  const proxyReq = client.request(
-    immichReqUrl,
-    {
-      method: 'GET',
-      agent: keepAliveAgent,
-      headers: {
-        'x-api-key': immichKey,
-        accept: req.headers.accept || '*/*',
+  let activeProxyReq = null;
+  let clientClosed = false;
+
+  const onResClose = () => {
+    clientClosed = true;
+    if (!res.writableEnded && activeProxyReq) {
+      activeProxyReq.destroy();
+    }
+  };
+  res.on('close', onResClose);
+
+  const forwardHeaders = {
+    'x-api-key': immichKey,
+    accept: req.headers.accept || '*/*',
+  };
+  if (req.headers.range) forwardHeaders['range'] = req.headers.range;
+  if (req.headers['if-range']) forwardHeaders['if-range'] = req.headers['if-range'];
+  if (req.headers['if-none-match']) forwardHeaders['if-none-match'] = req.headers['if-none-match'];
+
+  const sendUpstreamRequest = (upstreamPath, nextFallback) => {
+    const immichReqUrl = new URL(upstreamPath, immichUrl);
+    const proxyReq = client.request(
+      immichReqUrl,
+      {
+        method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+        agent: keepAliveAgent,
+        headers: forwardHeaders,
       },
-    },
-    (proxyRes) => {
-      const headers = {
-        'Content-Type': proxyRes.headers['content-type'] || 'image/jpeg',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*',
-      };
-      if (proxyRes.headers['content-length']) {
-        headers['Content-Length'] = proxyRes.headers['content-length'];
-      }
-      if (proxyRes.headers['etag']) {
-        headers['ETag'] = proxyRes.headers['etag'];
-      }
-      res.writeHead(proxyRes.statusCode || 200, headers);
-      proxyRes.pipe(res);
-    }
-  );
+      (proxyRes) => {
+        if (proxyRes.statusCode === 404 && nextFallback) {
+          proxyRes.resume();
+          if (!clientClosed) {
+            sendUpstreamRequest(nextFallback);
+          }
+          return;
+        }
 
-  proxyReq.on('error', (err) => {
-    console.error('Immich original proxy error:', err);
-    if (!res.headersSent) {
-      res.statusCode = 502;
-      res.end('Bad gateway to Immich');
+        const headers = {
+          'Content-Type': proxyRes.headers['content-type'] || defaultContentType,
+          'Accept-Ranges': proxyRes.headers['accept-ranges'] || 'bytes',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Access-Control-Allow-Origin': '*',
+          'X-Accel-Buffering': 'no',
+        };
+        if (proxyRes.headers['content-length']) {
+          headers['Content-Length'] = proxyRes.headers['content-length'];
+        }
+        if (proxyRes.headers['content-range']) {
+          headers['Content-Range'] = proxyRes.headers['content-range'];
+        }
+        if (proxyRes.headers['etag']) {
+          headers['ETag'] = proxyRes.headers['etag'];
+        }
+
+        res.writeHead(proxyRes.statusCode || 200, headers);
+        if (req.method === 'HEAD') {
+          proxyRes.resume();
+          res.end();
+        } else {
+          proxyRes.pipe(res);
+        }
+      }
+    );
+
+    activeProxyReq = proxyReq;
+    proxyReq.on('error', (err) => {
+      if (clientClosed) return;
+      console.error('Immich media proxy error:', err);
+      if (!res.headersSent) {
+        res.statusCode = 502;
+        res.end('Bad gateway to Immich');
+      } else {
+        res.destroy();
+      }
+    });
+
+    proxyReq.end();
+  };
+
+  sendUpstreamRequest(targetPath, fallbackPath);
+}
+
+async function handleMediaMetaRequest(rawIdsParam, req, res) {
+  try {
+    const targetIds = rawIdsParam
+      ? Array.from(
+          new Set(
+            rawIdsParam
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => VALID_ID_RE.test(s))
+          )
+        ).slice(0, 2000)
+      : await collectTripAssetIds();
+
+    await ensureAssetsMeta(targetIds);
+
+    const videos = {};
+    for (const id of targetIds) {
+      const rec = assetMetaCache.get(id);
+      if (rec?.type === 'VIDEO') {
+        videos[id] = {
+          ...(rec.durationMs !== undefined ? { durationMs: rec.durationMs } : {}),
+          ...(rec.mime ? { mime: rec.mime } : {}),
+        };
+      }
+    }
+
+    const body = JSON.stringify({ videos });
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Length': String(Buffer.byteLength(body)),
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+    });
+    if (req.method === 'HEAD') {
+      res.end();
     } else {
-      res.destroy();
+      res.end(body);
     }
-  });
-
-  proxyReq.end();
+  } catch (err) {
+    console.error('Media meta error:', err);
+    res.statusCode = 500;
+    res.end('Failed to load media metadata');
+  }
 }
 
 async function handleMediaRequest(assetId, rawSize, req, res) {
@@ -234,12 +500,23 @@ async function handleMediaRequest(assetId, rawSize, req, res) {
   }
 
   const tier =
-    rawSize === 'grid' || rawSize === 'preview' || rawSize === 'original'
+    rawSize === 'grid' || rawSize === 'preview' || rawSize === 'original' || rawSize === 'video'
       ? rawSize
       : 'thumbnail';
 
+  if (tier === 'video') {
+    streamImmichMedia(
+      `/api/assets/${assetId}/video/playback`,
+      'video/mp4',
+      req,
+      res,
+      `/api/assets/${assetId}/original`
+    );
+    return;
+  }
+
   if (tier === 'original') {
-    streamOriginal(assetId, req, res);
+    streamImmichMedia(`/api/assets/${assetId}/original`, 'application/octet-stream', req, res);
     return;
   }
 
@@ -371,13 +648,19 @@ const server = http.createServer((req, res) => {
   if (pathname.startsWith('/media/')) {
     const subPath = pathname.slice('/media'.length);
     const match = subPath.match(
-      /^\/(thumbnail|grid|preview|original)\/([a-zA-Z0-9-]+)\.(webp|jpg|jpeg)$/i
+      /^\/(thumbnail|grid|preview|original|video)\/([a-zA-Z0-9-]+)\.(webp|jpg|jpeg|mp4|mov|webm)$/i
     );
     if (match) {
       const [, tier, assetId] = match;
       void handleMediaRequest(assetId, tier.toLowerCase(), req, res);
       return;
     }
+  }
+
+  if (pathname === '/api/media-meta') {
+    const idsParam = reqUrl.searchParams.get('ids');
+    void handleMediaMetaRequest(idsParam, req, res);
+    return;
   }
 
   if (pathname === '/api/media') {
@@ -392,41 +675,10 @@ const server = http.createServer((req, res) => {
 
 async function prewarmMediaCache() {
   try {
-    const rawJson = await fs.readFile(path.join(rootDir, 'src/data/trips.json'), 'utf8');
-    const parsed = JSON.parse(rawJson);
-    const trips = Array.isArray(parsed) ? parsed : [parsed];
+    const queue = await collectTripAssetIds();
+    await ensureAssetsMeta(queue);
+    if (stopped) return;
 
-    try {
-      const tripsDir = path.join(rootDir, 'src/data/trips');
-      const entries = await fs.readdir(tripsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.json')) {
-          const extraRaw = await fs.readFile(path.join(tripsDir, entry.name), 'utf8');
-          const extraParsed = JSON.parse(extraRaw);
-          if (Array.isArray(extraParsed)) {
-            trips.push(...extraParsed);
-          } else if (extraParsed && typeof extraParsed === 'object') {
-            trips.push(extraParsed);
-          }
-        }
-      }
-    } catch {
-      // Optional src/data/trips directory may not exist
-    }
-
-    const ids = new Set();
-    for (const t of trips) {
-      if (t?.cover_image && VALID_ID_RE.test(t.cover_image)) ids.add(t.cover_image);
-      for (const d of t?.itinerary || []) {
-        for (const s of d?.spots || []) {
-          for (const imgId of s?.images || []) {
-            if (VALID_ID_RE.test(imgId)) ids.add(imgId);
-          }
-        }
-      }
-    }
-
-    const queue = Array.from(ids);
     const worker = async () => {
       while (!stopped && queue.length > 0) {
         const id = queue.shift();

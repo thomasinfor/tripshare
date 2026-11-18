@@ -15,7 +15,15 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import UndoIcon from '@mui/icons-material/Undo';
-import { getMediaUrl, scheduleMediaPrefetch, isMediaDecoded, markMediaDecoded } from '../utils/media';
+import {
+  getMediaUrl,
+  getOriginalDownloadUrl,
+  scheduleMediaPrefetch,
+  isMediaDecoded,
+  markMediaDecoded,
+  isVideoAsset,
+  useMediaMetaVersion,
+} from '../utils/media';
 
 interface LightboxModalProps {
   images: string[];
@@ -40,10 +48,12 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
   onClose,
   onSelectImage,
 }) => {
+  useMediaMetaVersion();
   const currentIndex = images.indexOf(currentImage);
+  const isVideo = isVideoAsset(currentImage);
   const gridUrl = getMediaUrl(currentImage, 'grid');
   const previewUrl = getMediaUrl(currentImage, 'preview');
-  const originalUrl = getMediaUrl(currentImage, 'original');
+  const originalUrl = getOriginalDownloadUrl(currentImage);
 
   const initialFullReady = isMediaDecoded(previewUrl);
   const instantRef = useRef(initialFullReady);
@@ -223,11 +233,11 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
                 </Button>
               </>
             )}
-            <Tooltip title="Download original photo">
+            <Tooltip title={isVideo ? 'Download original video' : 'Download original photo'}>
               <IconButton
                 component="a"
                 href={originalUrl}
-                download={`${currentImage}.jpg`}
+                download={isVideo ? `${currentImage}.mp4` : `${currentImage}.jpg`}
                 target="_blank"
                 size="small"
                 sx={{ color: '#6b6860', '&:hover': { color: '#161615', bgcolor: 'rgba(22, 22, 21, 0.06)' } }}
@@ -247,9 +257,10 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
           </Box>
         </Box>
 
-        {/* Center Image Viewport (Warm Matboard) with Touch Swipe */}
+        {/* Center Media Viewport (Warm Matboard) with Touch Swipe */}
         <Box
           onTouchStart={(e) => {
+            if (e.target instanceof HTMLVideoElement) return;
             if (e.touches.length === 1) {
               touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
@@ -297,56 +308,80 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             </IconButton>
           )}
 
-          {/* Instant cached 660px grid image — stays opaque underneath until 1360px preview finishes fading in */}
-          <Box
-            component="img"
-            key={`lb-grid-${currentImage}`}
-            src={gridUrl}
-            alt=""
-            decoding="async"
-            sx={{
-              position: 'absolute',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-              opacity: isFullLoaded ? 0 : 1,
-              transition:
-                isFullLoaded && !instantRef.current
-                  ? 'opacity 0.05s linear 0.22s'
-                  : 'none',
-              pointerEvents: 'none',
-            }}
-          />
+          {isVideo ? (
+            <Box
+              component="video"
+              key={`lb-video-${currentImage}`}
+              src={getMediaUrl(currentImage, 'video')}
+              poster={previewUrl}
+              controls
+              autoPlay
+              playsInline
+              sx={{
+                position: 'relative',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                bgcolor: '#0f0f0e',
+                outline: 'none',
+              }}
+            />
+          ) : (
+            <>
+              {/* Instant cached 660px grid image — stays opaque underneath until 1360px preview finishes fading in */}
+              <Box
+                component="img"
+                key={`lb-grid-${currentImage}`}
+                src={gridUrl}
+                alt=""
+                decoding="async"
+                sx={{
+                  position: 'absolute',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  opacity: isFullLoaded ? 0 : 1,
+                  transition:
+                    isFullLoaded && !instantRef.current
+                      ? 'opacity 0.05s linear 0.22s'
+                      : 'none',
+                  pointerEvents: 'none',
+                }}
+              />
 
-          {/* High-res 1360px WebP photo */}
-          <Box
-            component="img"
-            key={`lb-preview-${currentImage}`}
-            src={previewUrl}
-            alt={`${spotName} fullscreen`}
-            onLoad={(e) => {
-              const imgEl = e.currentTarget as HTMLImageElement;
-              const finish = () => {
-                markMediaDecoded(previewUrl);
-                setIsFullLoaded(true);
-              };
-              if (typeof imgEl.decode === 'function') {
-                imgEl.decode().then(finish).catch(finish);
-              } else {
-                finish();
-              }
-            }}
-            sx={{
-              position: 'relative',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-              userSelect: 'none',
-              opacity: isFullLoaded ? 1 : 0,
-              willChange: isFullLoaded ? 'auto' : 'opacity',
-              transition: instantRef.current ? 'none' : 'opacity 0.2s ease-out',
-            }}
-          />
+              {/* High-res 1360px WebP photo */}
+              <Box
+                component="img"
+                key={`lb-preview-${currentImage}`}
+                src={previewUrl}
+                alt={`${spotName} fullscreen`}
+                onLoad={(e) => {
+                  const imgEl = e.currentTarget as HTMLImageElement;
+                  const finish = () => {
+                    markMediaDecoded(previewUrl);
+                    setIsFullLoaded(true);
+                  };
+                  if (typeof imgEl.decode === 'function') {
+                    imgEl.decode().then(finish).catch(finish);
+                  } else {
+                    finish();
+                  }
+                }}
+                sx={{
+                  position: 'relative',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  userSelect: 'none',
+                  opacity: isFullLoaded ? 1 : 0,
+                  willChange: isFullLoaded ? 'auto' : 'opacity',
+                  transition: instantRef.current ? 'none' : 'opacity 0.2s ease-out',
+                }}
+              />
+            </>
+          )}
 
           {images.length > 1 && (
             <IconButton
@@ -389,7 +424,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             noWrap
             sx={{ color: '#6b6860', fontFamily: "'JetBrains Mono', monospace", minWidth: 0 }}
           >
-            Asset ID: {currentImage}
+            Asset ID: {currentImage}{isVideo ? ' · Video' : ''}
           </Typography>
           <Typography
             variant="caption"
@@ -400,7 +435,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            Use ← and → arrows to browse photos
+            Use ← and → arrows to browse media
           </Typography>
           <Typography
             variant="caption"

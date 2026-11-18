@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Spot } from '../types';
 import { formatCoords } from '../utils/geo';
-import { getMediaUrl, isMediaDecoded, markMediaDecoded } from '../utils/media';
+import {
+  getMediaUrl,
+  isMediaDecoded,
+  markMediaDecoded,
+  isVideoAsset,
+  getVideoMeta,
+  formatVideoDuration,
+  useMediaMetaVersion,
+} from '../utils/media';
 import { SpotPhotoDraft, extractImmichAssetIds } from '../utils/photoDrafts';
 import {
   Box,
@@ -14,6 +22,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import UndoIcon from '@mui/icons-material/Undo';
@@ -68,6 +77,9 @@ interface StackPhotoItemProps {
   index: number;
   spotName: string;
   scrollRoot: HTMLDivElement | null;
+  isVideo?: boolean;
+  videoDuration?: string;
+  isPlayingInline?: boolean;
   isEditMode?: boolean;
   isAdded?: boolean;
   isRemoved?: boolean;
@@ -81,6 +93,7 @@ interface StackPhotoItemProps {
   onDragEndAsset?: () => void;
   onDropOnAsset?: (targetAssetId: string) => void;
   onToggleRemove?: (assetId: string) => void;
+  onStartInlinePlay?: () => void;
   onOpenLightbox: (assetId: string) => void;
 }
 
@@ -89,6 +102,9 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
   index,
   spotName,
   scrollRoot,
+  isVideo = false,
+  videoDuration = '',
+  isPlayingInline = false,
   isEditMode = false,
   isAdded = false,
   isRemoved = false,
@@ -102,6 +118,7 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
   onDragEndAsset,
   onDropOnAsset,
   onToggleRemove,
+  onStartInlinePlay,
   onOpenLightbox,
 }) => {
   const thumbUrl = getMediaUrl(assetId, 'thumbnail');
@@ -140,11 +157,19 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
   }, [inView, scrollRoot]);
 
   const canReorder = import.meta.env.DEV && isEditMode && !isRemoved && activeCount > 1;
+  const showInlineVideo = isVideo && isPlayingInline && !isEditMode;
 
   return (
     <Box
       ref={cardRef}
-      onClick={() => onOpenLightbox(assetId)}
+      onClick={() => {
+        if (showInlineVideo) return;
+        if (isVideo && !isEditMode && onStartInlinePlay) {
+          onStartInlinePlay();
+        } else {
+          onOpenLightbox(assetId);
+        }
+      }}
       draggable={canReorder}
       onDragStart={(e) => {
         if (!canReorder) return;
@@ -173,7 +198,13 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         borderRadius: '2px',
         overflow: 'hidden',
         bgcolor: '#ebe6dc',
-        cursor: canReorder ? 'grab' : 'zoom-in',
+        cursor: showInlineVideo
+          ? 'default'
+          : canReorder
+          ? 'grab'
+          : isVideo && !isEditMode
+          ? 'pointer'
+          : 'zoom-in',
         border: isRemoved
           ? '1.5px dashed #b91c1c'
           : isAdded
@@ -192,6 +223,10 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         },
         '&:hover .photo-hover-overlay': {
           opacity: 1,
+        },
+        '&:hover .video-play-medallion': {
+          transform: 'translate(-50%, -50%) scale(1.08)',
+          bgcolor: 'rgba(22, 22, 21, 0.86)',
         },
         '@media (hover: none)': {
           '& .photo-hover-overlay': {
@@ -218,14 +253,17 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
           minHeight: 80,
           filter: 'blur(1px)',
           transform: 'scale(1.005)',
-          opacity: gridLoaded ? 0 : 1,
-          transition: gridLoaded && !instantRef.current ? 'opacity 0.05s linear 0.22s' : 'none',
+          opacity: showInlineVideo || gridLoaded ? 0 : 1,
+          transition:
+            !showInlineVideo && gridLoaded && !instantRef.current
+              ? 'opacity 0.05s linear 0.22s'
+              : 'none',
           pointerEvents: 'none',
         }}
       />
 
       {/* Phase 2: Crisp WebP upgrades after decode, keeping thumbnail opaque underneath until fade completes */}
-      {inView && thumbReady && (
+      {inView && thumbReady && !showInlineVideo && (
         <Box
           component="img"
           className="photo-zoom-img"
@@ -253,6 +291,120 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
         />
       )}
 
+      {/* Inline Video Player when active in 2-column gallery */}
+      {showInlineVideo && (
+        <>
+          <Box
+            component="video"
+            key={`inline-vid-${assetId}`}
+            src={getMediaUrl(assetId, 'video')}
+            poster={gridUrl}
+            controls
+            autoPlay
+            playsInline
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              bgcolor: '#0f0f0e',
+              zIndex: 3,
+            }}
+          />
+          <Tooltip title="Open in Lightbox" arrow>
+            <IconButton
+              size="small"
+              aria-label="Open video in Lightbox"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenLightbox(assetId);
+              }}
+              sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                zIndex: 4,
+                bgcolor: 'rgba(255, 255, 255, 0.92)',
+                backdropFilter: 'blur(8px)',
+                color: '#161615',
+                border: '1px solid rgba(22, 22, 21, 0.12)',
+                '&:hover': { bgcolor: '#161615', color: '#f5f2eb' },
+              }}
+            >
+              <FullscreenIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+
+      {/* Video Play Medallion & Duration Pill (poster state) */}
+      {isVideo && !showInlineVideo && (
+        <>
+          <Box
+            className="video-play-medallion"
+            onClick={
+              isEditMode
+                ? (e) => {
+                    e.stopPropagation();
+                    onOpenLightbox(assetId);
+                  }
+                : undefined
+            }
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 46,
+              height: 46,
+              borderRadius: '50%',
+              bgcolor: 'rgba(22, 22, 21, 0.72)',
+              backdropFilter: 'blur(8px)',
+              border: '1.5px solid rgba(255, 255, 255, 0.88)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+              boxShadow: '0 6px 18px rgba(22, 22, 21, 0.30)',
+              transition: 'transform 0.2s ease, background-color 0.2s ease',
+              pointerEvents: isEditMode ? 'auto' : 'none',
+            }}
+          >
+            <PlayArrowRoundedIcon sx={{ fontSize: 28, ml: 0.25 }} />
+          </Box>
+          {!isEditMode && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                zIndex: 2,
+                pointerEvents: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.4,
+                px: 0.9,
+                py: 0.25,
+                borderRadius: '999px',
+                bgcolor: 'rgba(22, 22, 21, 0.76)',
+                backdropFilter: 'blur(6px)',
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                color: '#f5f2eb',
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '10.5px',
+                fontWeight: 600,
+                letterSpacing: '0.03em',
+              }}
+            >
+              {videoDuration ? `▶ ${videoDuration}` : '▶ VIDEO'}
+            </Box>
+          )}
+        </>
+      )}
+
       {/* Subtle gallery hover controls */}
       <Box
         className="photo-hover-overlay"
@@ -263,27 +415,40 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
           opacity: 0,
           transition: 'opacity 0.2s ease',
           pointerEvents: 'none',
-          display: isEditMode ? 'none' : 'flex',
+          display: isEditMode || showInlineVideo ? 'none' : 'flex',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
           p: 1,
         }}
       >
-        <Chip
-          label={`#${index + 1}`}
-          size="small"
-          sx={{
-            height: 20,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 10.5,
-            fontWeight: 600,
-            bgcolor: 'rgba(255, 255, 255, 0.9)',
-            color: '#161615',
-            borderColor: 'rgba(22, 22, 21, 0.10)',
-            backdropFilter: 'blur(6px)',
-          }}
-        />
+        {!isVideo ? (
+          <Chip
+            label={`#${index + 1}`}
+            size="small"
+            sx={{
+              height: 20,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10.5,
+              fontWeight: 600,
+              bgcolor: 'rgba(255, 255, 255, 0.9)',
+              color: '#161615',
+              borderColor: 'rgba(22, 22, 21, 0.10)',
+              backdropFilter: 'blur(6px)',
+            }}
+          />
+        ) : (
+          <span />
+        )}
         <Box
+          onClick={
+            isVideo
+              ? (e) => {
+                  e.stopPropagation();
+                  onOpenLightbox(assetId);
+                }
+              : undefined
+          }
+          title={isVideo ? 'Open in Lightbox' : undefined}
           sx={{
             width: 26,
             height: 26,
@@ -295,6 +460,9 @@ const StackPhotoItem: React.FC<StackPhotoItemProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            pointerEvents: isVideo ? 'auto' : 'none',
+            cursor: isVideo ? 'pointer' : 'inherit',
+            ...(isVideo ? { '&:hover': { bgcolor: '#161615', color: '#f5f2eb' } } : {}),
           }}
         >
           <FullscreenIcon sx={{ fontSize: 16 }} />
@@ -540,9 +708,11 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   onOpenDraftReview,
   onOpenLightbox,
 }) => {
+  useMediaMetaVersion();
   const images = spot.images && spot.images.length > 0 ? spot.images : [];
   const isSingleImage = images.length === 1;
   const singleAssetId = images[0] || '';
+  const singleIsVideo = isSingleImage && isVideoAsset(singleAssetId);
   const singleThumbUrl = singleAssetId ? getMediaUrl(singleAssetId, 'thumbnail') : '';
   const singlePreviewUrl = singleAssetId ? getMediaUrl(singleAssetId, 'preview') : '';
 
@@ -552,6 +722,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
   const singleInstantRef = useRef(initialSingleReady);
   const [singleThumbReady, setSingleThumbReady] = useState(initialSingleReady);
   const [singleLoaded, setSingleLoaded] = useState(initialSingleReady);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [inputFeedback, setInputFeedback] = useState<{ severity: 'ok' | 'err'; text: string } | null>(null);
   const [draggingAssetId, setDraggingAssetId] = useState<string | null>(null);
@@ -562,7 +733,22 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
     setInputFeedback(null);
     setDraggingAssetId(null);
     setDragOverAssetId(null);
+    setPlayingVideoId(null);
   }, [spot.id]);
+
+  const handleOpenLightbox = (assetId: string) => {
+    setPlayingVideoId(null);
+    onOpenLightbox(assetId);
+  };
+
+  const videoCount = images.reduce((acc, id) => acc + (isVideoAsset(id) ? 1 : 0), 0);
+  const photoCount = images.length - videoCount;
+  const mediaSummaryLabel =
+    videoCount > 0 && photoCount > 0
+      ? `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} · ${videoCount} ${videoCount === 1 ? 'video' : 'videos'}`
+      : videoCount > 0
+      ? `${videoCount} ${videoCount === 1 ? 'video' : 'videos'}`
+      : `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`;
 
   const baseSet = new Set(baseImages ?? images);
   const addedSet = new Set(spotDraft?.addedIds ?? []);
@@ -659,6 +845,43 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
     .filter(Boolean)
     .join('  ·  ');
 
+  const renderStackItem = (assetId: string, index: number) => {
+    const itemIsVideo = isVideoAsset(assetId);
+    const videoDuration = itemIsVideo ? formatVideoDuration(getVideoMeta(assetId)?.durationMs) : '';
+    return (
+      <StackPhotoItem
+        key={`${assetId}-${index}`}
+        assetId={assetId}
+        index={index}
+        spotName={spot.name}
+        scrollRoot={scrollEl}
+        isVideo={itemIsVideo}
+        videoDuration={videoDuration}
+        isPlayingInline={playingVideoId === assetId}
+        isEditMode={isEditMode}
+        isAdded={addedSet.has(assetId) && !baseSet.has(assetId)}
+        isRemoved={removedSet.has(assetId)}
+        activePosition={activeIndexMap.get(assetId)}
+        activeCount={activeImages.length}
+        isDragSource={draggingAssetId === assetId}
+        isDragTarget={dragOverAssetId === assetId && draggingAssetId !== assetId}
+        onMoveToPosition={(targetIdx) => moveActivePhoto(assetId, targetIdx)}
+        onDragStartAsset={(id) => setDraggingAssetId(id)}
+        onDragOverAsset={(id) => {
+          if (dragOverAssetId !== id) setDragOverAssetId(id);
+        }}
+        onDragEndAsset={() => {
+          setDraggingAssetId(null);
+          setDragOverAssetId(null);
+        }}
+        onDropOnAsset={handleDropOnAsset}
+        onToggleRemove={onToggleRemovePhoto}
+        onStartInlinePlay={() => setPlayingVideoId(assetId)}
+        onOpenLightbox={handleOpenLightbox}
+      />
+    );
+  };
+
   return (
     <Box
       ref={setScrollEl}
@@ -748,9 +971,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             </span>
           )}
           <span>{formatCoords(spot.lat, spot.lng)}</span>
-          <span>
-            {images.length} {images.length === 1 ? 'photo' : 'photos'}
-          </span>
+          <span>{mediaSummaryLabel}</span>
           {spot.google_maps_place?.url && (
             <Box
               component="a"
@@ -1034,9 +1255,9 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           </Typography>
         </Box>
       ) : isSingleImage ? (
-        /* Single Image Mode: Full width, bounded height on desktop, scrollable min-height on mobile */
+        /* Single Item Mode: Full width, bounded height on desktop, scrollable min-height on mobile */
         <Box
-          onClick={() => onOpenLightbox(singleAssetId)}
+          onClick={singleIsVideo ? undefined : () => handleOpenLightbox(singleAssetId)}
           sx={{
             flex: 1,
             minHeight: { xs: 240, sm: 0 },
@@ -1044,8 +1265,8 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             position: 'relative',
             borderRadius: '3px',
             overflow: 'hidden',
-            bgcolor: '#ebe6dc',
-            cursor: 'zoom-in',
+            bgcolor: singleIsVideo ? '#0f0f0e' : '#ebe6dc',
+            cursor: singleIsVideo ? 'default' : 'zoom-in',
             border: removedSet.has(singleAssetId)
               ? '1.5px dashed #b91c1c'
               : addedSet.has(singleAssetId) && !baseSet.has(singleAssetId)
@@ -1056,92 +1277,119 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           }}
         >
           {/* Soft warm matboard ambient backdrop for portrait or ultra-wide aspect ratios */}
-          <Box
-            component="img"
-            src={singleThumbUrl}
-            alt=""
-            decoding="async"
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter: 'blur(32px) brightness(1.04) saturate(0.85)',
-              opacity: 0.38,
-              transform: 'scale(1.1)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          {/* Fast thumbnail placeholder — stays opaque underneath until foreground reveal finishes */}
-          <Box
-            component="img"
-            key={`single-thumb-${singleAssetId}`}
-            src={singleThumbUrl}
-            alt=""
-            fetchPriority="high"
-            decoding="async"
-            onLoad={() => setSingleThumbReady(true)}
-            onError={() => setSingleThumbReady(true)}
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              filter: 'blur(1.5px)',
-              opacity: singleLoaded ? 0 : 1,
-              transition:
-                singleLoaded && !singleInstantRef.current
-                  ? 'opacity 0.05s linear 0.22s'
-                  : 'none',
-              pointerEvents: 'none',
-            }}
-          />
-
-          {singleThumbReady && (
+          {!singleIsVideo && (
             <Box
               component="img"
-              key={`single-preview-${singleAssetId}`}
-              src={singlePreviewUrl}
-              alt={`${spot.name} - Photo 1`}
-              onLoad={(e) => {
-                const imgEl = e.currentTarget as HTMLImageElement;
-                decodeAndRun(imgEl, () => {
-                  markMediaDecoded(singlePreviewUrl);
-                  setSingleLoaded(true);
-                });
+              src={singleThumbUrl}
+              alt=""
+              decoding="async"
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'blur(32px) brightness(1.04) saturate(0.85)',
+                opacity: 0.38,
+                transform: 'scale(1.1)',
+                pointerEvents: 'none',
               }}
+            />
+          )}
+
+          {singleIsVideo ? (
+            <Box
+              component="video"
+              key={`single-vid-${singleAssetId}`}
+              src={getMediaUrl(singleAssetId, 'video')}
+              poster={singlePreviewUrl}
+              controls
+              playsInline
+              preload="metadata"
+              onClick={(e) => e.stopPropagation()}
               sx={{
                 position: 'relative',
                 width: '100%',
                 height: '100%',
                 objectFit: 'contain',
                 display: 'block',
-                opacity: singleLoaded ? 1 : 0,
-                willChange: singleLoaded ? 'auto' : 'opacity',
-                transition: singleInstantRef.current
-                  ? 'transform 0.35s ease'
-                  : 'opacity 0.2s ease-out, transform 0.35s ease',
-                '&:hover': {
-                  transform: 'scale(1.015)',
-                },
+                zIndex: 2,
               }}
             />
+          ) : (
+            <>
+              {/* Fast thumbnail placeholder — stays opaque underneath until foreground reveal finishes */}
+              <Box
+                component="img"
+                key={`single-thumb-${singleAssetId}`}
+                src={singleThumbUrl}
+                alt=""
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setSingleThumbReady(true)}
+                onError={() => setSingleThumbReady(true)}
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: 'blur(1.5px)',
+                  opacity: singleLoaded ? 0 : 1,
+                  transition:
+                    singleLoaded && !singleInstantRef.current
+                      ? 'opacity 0.05s linear 0.22s'
+                      : 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {singleThumbReady && (
+                <Box
+                  component="img"
+                  key={`single-preview-${singleAssetId}`}
+                  src={singlePreviewUrl}
+                  alt={`${spot.name} - Photo 1`}
+                  onLoad={(e) => {
+                    const imgEl = e.currentTarget as HTMLImageElement;
+                    decodeAndRun(imgEl, () => {
+                      markMediaDecoded(singlePreviewUrl);
+                      setSingleLoaded(true);
+                    });
+                  }}
+                  sx={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    opacity: singleLoaded ? 1 : 0,
+                    willChange: singleLoaded ? 'auto' : 'opacity',
+                    transition: singleInstantRef.current
+                      ? 'transform 0.35s ease'
+                      : 'opacity 0.2s ease-out, transform 0.35s ease',
+                    '&:hover': {
+                      transform: 'scale(1.015)',
+                    },
+                  }}
+                />
+              )}
+            </>
           )}
 
           <Tooltip title="View Fullscreen" arrow>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenLightbox(singleAssetId);
+                handleOpenLightbox(singleAssetId);
               }}
               size="small"
               sx={{
                 position: 'absolute',
-                bottom: 12,
+                top: singleIsVideo ? (import.meta.env.DEV && isEditMode ? 48 : 12) : 'auto',
+                bottom: singleIsVideo ? 'auto' : 12,
                 right: 12,
+                zIndex: 4,
                 bgcolor: 'rgba(255, 255, 255, 0.92)',
                 backdropFilter: 'blur(8px)',
                 color: '#161615',
@@ -1244,7 +1492,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
           )}
         </Box>
       ) : isMobileScreen ? (
-        /* Mobile Multi-Image Mode: Full-width single-column stack */
+        /* Mobile Multi-Item Mode: Full-width single-column stack */
         <Box
           sx={{
             display: 'flex',
@@ -1254,37 +1502,10 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
             pb: 1,
           }}
         >
-          {images.map((assetId, index) => (
-            <StackPhotoItem
-              key={`${assetId}-${index}`}
-              assetId={assetId}
-              index={index}
-              spotName={spot.name}
-              scrollRoot={scrollEl}
-              isEditMode={isEditMode}
-              isAdded={addedSet.has(assetId) && !baseSet.has(assetId)}
-              isRemoved={removedSet.has(assetId)}
-              activePosition={activeIndexMap.get(assetId)}
-              activeCount={activeImages.length}
-              isDragSource={draggingAssetId === assetId}
-              isDragTarget={dragOverAssetId === assetId && draggingAssetId !== assetId}
-              onMoveToPosition={(targetIdx) => moveActivePhoto(assetId, targetIdx)}
-              onDragStartAsset={(id) => setDraggingAssetId(id)}
-              onDragOverAsset={(id) => {
-                if (dragOverAssetId !== id) setDragOverAssetId(id);
-              }}
-              onDragEndAsset={() => {
-                setDraggingAssetId(null);
-                setDragOverAssetId(null);
-              }}
-              onDropOnAsset={handleDropOnAsset}
-              onToggleRemove={onToggleRemovePhoto}
-              onOpenLightbox={onOpenLightbox}
-            />
-          ))}
+          {images.map((assetId, index) => renderStackItem(assetId, index))}
         </Box>
       ) : (
-        /* Tablet/Desktop Multi-Image Mode: 2-Column Top-to-Bottom Image Stacks */
+        /* Tablet/Desktop Multi-Item Mode: 2-Column Top-to-Bottom Media Stacks */
         <Box
           sx={{
             display: 'flex',
@@ -1305,34 +1526,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               gap: 1.25,
             }}
           >
-            {leftStack.map(({ assetId, index }) => (
-              <StackPhotoItem
-                key={`${assetId}-${index}`}
-                assetId={assetId}
-                index={index}
-                spotName={spot.name}
-                scrollRoot={scrollEl}
-                isEditMode={isEditMode}
-                isAdded={addedSet.has(assetId) && !baseSet.has(assetId)}
-                isRemoved={removedSet.has(assetId)}
-                activePosition={activeIndexMap.get(assetId)}
-                activeCount={activeImages.length}
-                isDragSource={draggingAssetId === assetId}
-                isDragTarget={dragOverAssetId === assetId && draggingAssetId !== assetId}
-                onMoveToPosition={(targetIdx) => moveActivePhoto(assetId, targetIdx)}
-                onDragStartAsset={(id) => setDraggingAssetId(id)}
-                onDragOverAsset={(id) => {
-                  if (dragOverAssetId !== id) setDragOverAssetId(id);
-                }}
-                onDragEndAsset={() => {
-                  setDraggingAssetId(null);
-                  setDragOverAssetId(null);
-                }}
-                onDropOnAsset={handleDropOnAsset}
-                onToggleRemove={onToggleRemovePhoto}
-                onOpenLightbox={onOpenLightbox}
-              />
-            ))}
+            {leftStack.map(({ assetId, index }) => renderStackItem(assetId, index))}
           </Box>
 
           {/* Column 2 Stack */}
@@ -1345,34 +1539,7 @@ export const SpotShowcase: React.FC<SpotShowcaseProps> = ({
               gap: 1.25,
             }}
           >
-            {rightStack.map(({ assetId, index }) => (
-              <StackPhotoItem
-                key={`${assetId}-${index}`}
-                assetId={assetId}
-                index={index}
-                spotName={spot.name}
-                scrollRoot={scrollEl}
-                isEditMode={isEditMode}
-                isAdded={addedSet.has(assetId) && !baseSet.has(assetId)}
-                isRemoved={removedSet.has(assetId)}
-                activePosition={activeIndexMap.get(assetId)}
-                activeCount={activeImages.length}
-                isDragSource={draggingAssetId === assetId}
-                isDragTarget={dragOverAssetId === assetId && draggingAssetId !== assetId}
-                onMoveToPosition={(targetIdx) => moveActivePhoto(assetId, targetIdx)}
-                onDragStartAsset={(id) => setDraggingAssetId(id)}
-                onDragOverAsset={(id) => {
-                  if (dragOverAssetId !== id) setDragOverAssetId(id);
-                }}
-                onDragEndAsset={() => {
-                  setDraggingAssetId(null);
-                  setDragOverAssetId(null);
-                }}
-                onDropOnAsset={handleDropOnAsset}
-                onToggleRemove={onToggleRemovePhoto}
-                onOpenLightbox={onOpenLightbox}
-              />
-            ))}
+            {rightStack.map(({ assetId, index }) => renderStackItem(assetId, index))}
           </Box>
         </Box>
       )}
