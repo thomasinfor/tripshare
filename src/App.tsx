@@ -1212,6 +1212,7 @@ export const App: React.FC = () => {
     return (
       <TripCatalog
         trips={ALL_TRIPS}
+        googleApiKey={ENV_GOOGLE_MAPS_KEY}
         unknownSlug={unknownSlug}
         onSelectTrip={handleSelectTrip}
         onDismissUnknownSlug={handleDismissUnknownSlug}
