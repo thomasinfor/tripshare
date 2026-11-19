@@ -50,6 +50,8 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
 }) => {
   useMediaMetaVersion();
   const currentIndex = images.indexOf(currentImage);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < images.length - 1;
   const isVideo = isVideoAsset(currentImage);
   const gridUrl = getMediaUrl(currentImage, 'grid');
   const previewUrl = getMediaUrl(currentImage, 'preview');
@@ -66,24 +68,25 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
     setIsFullLoaded(already);
   }, [previewUrl]);
 
-  const handlePrev = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const prevIdx = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
-    const prevAsset = images[prevIdx];
-    const already = isMediaDecoded(getMediaUrl(prevAsset, 'preview'));
+  const selectAtIndex = (targetIdx: number) => {
+    const targetAsset = images[targetIdx];
+    if (!targetAsset) return;
+    const already = isMediaDecoded(getMediaUrl(targetAsset, 'preview'));
     instantRef.current = already;
     setIsFullLoaded(already);
-    onSelectImage(prevAsset);
+    onSelectImage(targetAsset);
+  };
+
+  const handlePrev = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!hasPrev) return;
+    selectAtIndex(currentIndex - 1);
   };
 
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const nextIdx = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
-    const nextAsset = images[nextIdx];
-    const already = isMediaDecoded(getMediaUrl(nextAsset, 'preview'));
-    instantRef.current = already;
-    setIsFullLoaded(already);
-    onSelectImage(nextAsset);
+    if (!hasNext) return;
+    selectAtIndex(currentIndex + 1);
   };
 
   useEffect(() => {
@@ -98,13 +101,11 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
 
   useEffect(() => {
     if (images.length <= 1 || currentIndex < 0) return;
-    const nextIdx = (currentIndex + 1) % images.length;
-    const prevIdx = (currentIndex - 1 + images.length) % images.length;
-    scheduleMediaPrefetch([
-      getMediaUrl(images[nextIdx], 'preview'),
-      getMediaUrl(images[prevIdx], 'preview'),
-    ]);
-  }, [currentIndex, images]);
+    const prefetchUrls: string[] = [];
+    if (hasNext) prefetchUrls.push(getMediaUrl(images[currentIndex + 1], 'preview'));
+    if (hasPrev) prefetchUrls.push(getMediaUrl(images[currentIndex - 1], 'preview'));
+    if (prefetchUrls.length > 0) scheduleMediaPrefetch(prefetchUrls);
+  }, [currentIndex, images, hasPrev, hasNext]);
 
   return (
     <Dialog
@@ -288,7 +289,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             touchAction: 'pan-y',
           }}
         >
-          {images.length > 1 && (
+          {hasPrev && (
             <IconButton
               size="small"
               aria-label="Previous photo"
@@ -383,7 +384,7 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
             </>
           )}
 
-          {images.length > 1 && (
+          {hasNext && (
             <IconButton
               size="small"
               aria-label="Next photo"

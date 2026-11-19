@@ -33,6 +33,27 @@ interface BottomNavigationProps {
 const TOUR_SLIDE_DURATION_MS = 5000;
 const TICK_MS = 100;
 
+const NAV_STEP_BUTTON_SX = {
+  width: { xs: 36, sm: 78 },
+  minWidth: { xs: 36, sm: 78 },
+  maxWidth: { xs: 36, sm: 78 },
+  height: 28,
+  minHeight: 28,
+  maxHeight: 28,
+  px: 0,
+  py: 0,
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  lineHeight: 1,
+  boxSizing: 'border-box',
+  borderRadius: '999px',
+  bgcolor: 'rgba(22, 22, 21, 0.04)',
+  border: '1px solid rgba(22, 22, 21, 0.12)',
+  color: '#161615',
+  fontSize: '11.5px',
+  '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
+} as const;
+
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   days,
   currentDayIndex,
@@ -233,63 +254,76 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           })}
         </Box>
 
-        {/* Action Controls: Day Route Toggle & Autoplay Tour */}
+        {/* Action Controls: Autoplay Tour */}
         <Stack direction="row" spacing={0.9} sx={{ alignItems: 'center', flexShrink: 0 }}>
-          <Button
-            size="small"
-            variant={viewMode === 'day-overview' ? 'contained' : 'outlined'}
-            onClick={onToggleDayOverview}
-            startIcon={<MapIcon sx={{ fontSize: 14 }} />}
-            sx={{
-              fontSize: '11.5px',
-              py: 0.3,
-              px: 1.2,
-              borderRadius: '999px',
-              display: { xs: 'none', sm: 'inline-flex' },
-              ...(viewMode === 'day-overview'
-                ? { bgcolor: '#161615', color: '#f5f2eb', borderColor: '#161615' }
-                : { borderColor: 'rgba(22, 22, 21, 0.14)', color: '#161615' }),
-            }}
-          >
-            {viewMode === 'day-overview' ? 'Spot Detail' : 'Day Route'}
-          </Button>
-
           {/* Tour Button with circular countdown indicator */}
           <Button
             size="small"
             onClick={() => setIsPlaying(!isPlaying)}
             startIcon={
-              isPlaying ? (
-                <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CircularProgress
-                    variant="determinate"
-                    value={tourProgressPercent}
-                    size={16}
-                    thickness={6}
-                    sx={{ color: '#b91c1c' }}
-                  />
-                  <PauseIcon sx={{ position: 'absolute', fontSize: 10, color: '#b91c1c' }} />
-                </Box>
-              ) : (
-                <PlayArrowIcon sx={{ fontSize: 15 }} />
-              )
+              <Box sx={{ position: 'relative', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                {isPlaying ? (
+                  <>
+                    <CircularProgress
+                      variant="determinate"
+                      value={tourProgressPercent}
+                      size={16}
+                      thickness={6}
+                      sx={{ color: '#b91c1c' }}
+                    />
+                    <PauseIcon sx={{ position: 'absolute', fontSize: 10, color: '#b91c1c' }} />
+                  </>
+                ) : (
+                  <PlayArrowIcon sx={{ fontSize: 15 }} />
+                )}
+              </Box>
             }
             sx={{
+              width: isPlaying ? 110 : 76,
+              minWidth: isPlaying ? 110 : 76,
+              maxWidth: isPlaying ? 110 : 76,
+              height: 26,
+              minHeight: 26,
+              maxHeight: 26,
+              px: 0,
+              py: 0,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              lineHeight: 1,
+              boxSizing: 'border-box',
               fontSize: '11.5px',
               fontWeight: 600,
-              py: 0.3,
-              px: 1.25,
               borderRadius: '999px',
               bgcolor: isPlaying ? 'rgba(185, 28, 28, 0.08)' : 'rgba(22, 22, 21, 0.04)',
               color: isPlaying ? '#b91c1c' : '#161615',
               border: isPlaying ? '1px solid rgba(185, 28, 28, 0.45)' : '1px solid rgba(22, 22, 21, 0.12)',
-              transition: 'all 0.2s',
+              transition: 'background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease',
+              '& .MuiButton-startIcon': { mr: '6px', ml: 0 },
               '&:hover': {
                 bgcolor: isPlaying ? 'rgba(185, 28, 28, 0.14)' : 'rgba(22, 22, 21, 0.09)',
               },
             }}
           >
-            {isPlaying ? `Pause (${remainingSeconds}s)` : 'Tour'}
+            {isPlaying ? (
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline' }}>
+                Pause (
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'inline-block',
+                    width: '1ch',
+                    textAlign: 'center',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {remainingSeconds}
+                </Box>
+                s)
+              </Box>
+            ) : (
+              'Tour'
+            )}
           </Button>
         </Stack>
       </Stack>
@@ -303,24 +337,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           onClick={onPrev}
           startIcon={<ArrowBackIcon sx={{ fontSize: 15 }} />}
           sx={{
-            minWidth: { xs: 36, sm: 76 },
-            px: { xs: 0.9, sm: 1.4 },
-            py: 0.4,
-            borderRadius: '999px',
-            bgcolor: 'rgba(22, 22, 21, 0.04)',
-            border: '1px solid rgba(22, 22, 21, 0.12)',
-            color: '#161615',
-            fontSize: '11.5px',
-            '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.75 }, ml: { xs: 0, sm: -0.25 } },
-            '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
+            ...NAV_STEP_BUTTON_SX,
+            '& .MuiButton-startIcon': { mr: { xs: 0, sm: '6px' }, ml: 0 },
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-            {viewMode === 'trip-overview'
-              ? 'Prev'
-              : viewMode === 'day-overview'
-              ? (currentDayIndex === 0 ? 'Trip Map' : 'Prev Spot')
-              : (currentSpotIndex === 0 ? 'Day Route' : 'Prev')}
+            Prev
           </Box>
         </Button>
 
@@ -492,26 +514,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           onClick={onNext}
           endIcon={<ArrowForwardIcon sx={{ fontSize: 15 }} />}
           sx={{
-            minWidth: { xs: 36, sm: 76 },
-            px: { xs: 0.9, sm: 1.4 },
-            py: 0.4,
-            borderRadius: '999px',
-            bgcolor: 'rgba(22, 22, 21, 0.04)',
-            border: '1px solid rgba(22, 22, 21, 0.12)',
-            color: '#161615',
-            fontSize: '11.5px',
-            '& .MuiButton-endIcon': { ml: { xs: 0, sm: 0.75 }, mr: { xs: 0, sm: -0.25 } },
-            '&:hover': { bgcolor: 'rgba(22, 22, 21, 0.09)' },
+            ...NAV_STEP_BUTTON_SX,
+            '& .MuiButton-endIcon': { ml: { xs: 0, sm: '6px' }, mr: 0 },
           }}
         >
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-            {viewMode === 'trip-overview'
-              ? 'Start Day 1'
-              : viewMode === 'day-overview'
-              ? 'Start Day'
-              : currentSpotIndex >= spots.length - 1
-              ? (currentDayIndex < days.length - 1 ? 'Next Day' : 'Finish')
-              : 'Next'}
+            Next
           </Box>
         </Button>
       </Stack>
