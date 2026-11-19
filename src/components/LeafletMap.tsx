@@ -77,6 +77,7 @@ interface LeafletMapProps {
   currentDayIndex: number;
   currentSpotIndex: number;
   mapStyle: MapStyle;
+  showAllDayRoute?: boolean;
   onSelectSpot: (dayIndex: number, spotIndex: number) => void;
   onSelectDay: (dayIndex: number) => void;
 }
@@ -105,6 +106,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   currentDayIndex,
   currentSpotIndex,
   mapStyle,
+  showAllDayRoute = true,
   onSelectSpot,
   onSelectDay,
 }) => {
@@ -449,7 +451,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     // =========================================================================
     if (viewMode === 'spot-detail' && currentSpot) {
       // 3A. Draw entire day road route faintly in background
-      if (currentDay.driving_route && currentDay.driving_route.length > 1) {
+      if (showAllDayRoute && currentDay.driving_route && currentDay.driving_route.length > 1) {
         L.polyline(currentDay.driving_route, {
           color: '#475569',
           weight: 3,
@@ -573,7 +575,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         }
       }
     }
-  }, [allDays, currentDayIndex, currentSpotIndex, viewMode, onSelectSpot, onSelectDay]);
+  }, [allDays, currentDayIndex, currentSpotIndex, viewMode, showAllDayRoute, onSelectSpot, onSelectDay]);
 
   return (
     <div className="leaflet-map-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>

@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, ColorScheme, useMap } from '@vis.gl/react-google-maps';
-import { Box, Typography, Button } from '@mui/material';
 import { ItineraryDay, MapStyle, ViewMode } from '../types';
 import { getDistinctDayColor, calculateDistanceKm } from '../utils/geo';
-import { KeyRound, Sparkles, Home, Flag } from 'lucide-react';
+import { Home, Flag } from 'lucide-react';
 
 interface GoogleMapViewProps {
   apiKey: string;
@@ -12,9 +11,8 @@ interface GoogleMapViewProps {
   currentDayIndex: number;
   currentSpotIndex: number;
   mapStyle: MapStyle;
+  showAllDayRoute?: boolean;
   onSelectSpot: (dayIndex: number, spotIndex: number) => void;
-  onSwitchToLeaflet: () => void;
-  onConfigureKey: () => void;
 }
 
 function getMapBoundsPadding(
@@ -45,7 +43,8 @@ const GoogleMapRouteController: React.FC<{
   allDays: ItineraryDay[];
   currentDayIndex: number;
   currentSpotIndex: number;
-}> = ({ viewMode, allDays, currentDayIndex, currentSpotIndex }) => {
+  showAllDayRoute: boolean;
+}> = ({ viewMode, allDays, currentDayIndex, currentSpotIndex, showAllDayRoute }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -127,7 +126,7 @@ const GoogleMapRouteController: React.FC<{
       activeBounds = bounds;
     } else if (viewMode === 'spot-detail' && currentSpot) {
       // Background day route
-      if (currentDay.driving_route && currentDay.driving_route.length > 1) {
+      if (showAllDayRoute && currentDay.driving_route && currentDay.driving_route.length > 1) {
         const fullPts = currentDay.driving_route.map(p => ({ lat: p[0], lng: p[1] }));
         const bgLine = new google.maps.Polyline({
           path: fullPts,
@@ -209,7 +208,7 @@ const GoogleMapRouteController: React.FC<{
       resizeObserver?.disconnect();
       polylines.forEach(p => p.setMap(null));
     };
-  }, [map, viewMode, allDays, currentDayIndex, currentSpotIndex]);
+  }, [map, viewMode, allDays, currentDayIndex, currentSpotIndex, showAllDayRoute]);
 
   return null;
 };
@@ -221,9 +220,8 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   currentDayIndex,
   currentSpotIndex,
   mapStyle,
+  showAllDayRoute = true,
   onSelectSpot,
-  onSwitchToLeaflet,
-  onConfigureKey,
 }) => {
   const currentDay = allDays[currentDayIndex] || allDays[0];
   const currentSpots = currentDay?.spots || [];
@@ -243,74 +241,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const colorScheme = mapStyle === 'dark' ? ColorScheme.DARK : ColorScheme.LIGHT;
 
   if (!apiKey || apiKey.trim() === '') {
-    return (
-      <Box
-        sx={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          p: 3,
-          bgcolor: '#f5f2eb',
-        }}
-      >
-        <Box
-          sx={{
-            maxWidth: 440,
-            p: 4,
-            textAlign: 'center',
-            borderRadius: 3,
-            bgcolor: '#ffffff',
-            border: '1px solid rgba(22, 22, 21, 0.10)',
-            boxShadow: '0 20px 50px rgba(22, 22, 21, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          <Box
-            sx={{
-              width: 52,
-              height: 52,
-              borderRadius: '50%',
-              bgcolor: 'rgba(185, 28, 28, 0.1)',
-              color: '#b91c1c',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <KeyRound size={26} />
-          </Box>
-          <Typography variant="h5" sx={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 28, color: '#161615' }}>
-            Google Maps API Key Required
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#6b6860', lineHeight: 1.6 }}>
-            To view Google Maps, set <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>.env.local</code> or enter your key in settings.
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 1.5, mt: 1 }}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={onConfigureKey}
-              startIcon={<KeyRound size={16} />}
-            >
-              Enter Google Maps Key
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={onSwitchToLeaflet}
-              startIcon={<Sparkles size={16} />}
-            >
-              Switch to OpenStreetMap (Free, No Key)
-            </Button>
-          </Box>
-        </Box>
-      </Box>
-    );
+    return null;
   }
 
   return (
@@ -335,6 +266,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
             allDays={allDays}
             currentDayIndex={currentDayIndex}
             currentSpotIndex={currentSpotIndex}
+            showAllDayRoute={showAllDayRoute}
           />
 
           {viewMode === 'trip-overview' ? (

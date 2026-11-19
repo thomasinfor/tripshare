@@ -1,63 +1,47 @@
 import React, { useState } from 'react';
-import { MapProvider, MapStyle } from '../types';
+import { MapStyle } from '../types';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  RadioGroup,
-  Radio,
   FormControlLabel,
-  FormControl,
   FormLabel,
-  TextField,
   Typography,
   Box,
   IconButton,
   ToggleButtonGroup,
   ToggleButton,
   Checkbox,
-  InputAdornment,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PublicIcon from '@mui/icons-material/Public';
-import KeyIcon from '@mui/icons-material/Key';
 import LayersIcon from '@mui/icons-material/Layers';
 
 interface MapConfigModalProps {
-  provider: MapProvider;
   mapStyle: MapStyle;
-  googleApiKey: string;
   showAllDayRoute: boolean;
   onClose: () => void;
   onSave: (config: {
-    provider: MapProvider;
     mapStyle: MapStyle;
-    googleApiKey: string;
     showAllDayRoute: boolean;
   }) => void;
 }
 
 export const MapConfigModal: React.FC<MapConfigModalProps> = ({
-  provider: initialProvider,
   mapStyle: initialStyle,
-  googleApiKey: initialKey,
   showAllDayRoute: initialShowAll,
   onClose,
   onSave,
 }) => {
-  const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [mapStyle, setMapStyle] = useState<MapStyle>(initialStyle);
-  const [apiKey, setApiKey] = useState(initialKey);
   const [showAllDayRoute, setShowAllDayRoute] = useState(initialShowAll);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
-      provider,
       mapStyle,
-      googleApiKey: apiKey.trim(),
       showAllDayRoute,
     });
     onClose();
@@ -105,7 +89,7 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
               color: '#161615',
             }}
           >
-            Map Settings &amp; Configuration
+            Map Display Settings
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: '#6b6860', '&:hover': { color: '#161615' }, flexShrink: 0 }}>
@@ -115,101 +99,6 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({
 
       <form onSubmit={handleSubmit}>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-          {/* Map Engine Provider */}
-          <FormControl component="fieldset">
-            <FormLabel
-              sx={{
-                fontFamily: "'JetBrains Mono', monospace",
-                color: '#6b6860',
-                fontWeight: 600,
-                fontSize: 11.5,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                mb: 1,
-              }}
-            >
-              Map Engine Provider
-            </FormLabel>
-            <RadioGroup
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as MapProvider)}
-              sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}
-            >
-              <Box
-                onClick={() => setProvider('leaflet')}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: provider === 'leaflet' ? 'rgba(22, 22, 21, 0.05)' : '#f9f7f2',
-                  border: '1px solid',
-                  borderColor: provider === 'leaflet' ? '#161615' : 'rgba(22, 22, 21, 0.10)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Radio checked={provider === 'leaflet'} sx={{ p: 0.5, mr: 1, color: '#161615', '&.Mui-checked': { color: '#161615' } }} />
-                <Box>
-                  <Typography variant="subtitle2" sx={{ color: '#161615', fontWeight: 700 }}>
-                    OpenStreetMap / Leaflet
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#6b6860' }}>
-                    Free open-source map tiles. Includes Streets, Satellite, and Dark modes.
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box
-                onClick={() => setProvider('google')}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: provider === 'google' ? 'rgba(22, 22, 21, 0.05)' : '#f9f7f2',
-                  border: '1px solid',
-                  borderColor: provider === 'google' ? '#161615' : 'rgba(22, 22, 21, 0.10)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Radio checked={provider === 'google'} sx={{ p: 0.5, mr: 1, color: '#161615', '&.Mui-checked': { color: '#161615' } }} />
-                <Box>
-                  <Typography variant="subtitle2" sx={{ color: '#161615', fontWeight: 700 }}>
-                    Google Maps (@vis.gl)
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#6b6860' }}>
-                    Google Maps JavaScript API. Uses API key from environment (.env.local) or custom key below.
-                  </Typography>
-                </Box>
-              </Box>
-            </RadioGroup>
-          </FormControl>
-
-          {/* Google API Key input */}
-          {provider === 'google' && (
-            <TextField
-              label="Google Maps JavaScript API Key"
-              variant="outlined"
-              size="small"
-              fullWidth
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy..."
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <KeyIcon sx={{ fontSize: 18, color: '#6b6860' }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              helperText="Configured in .env.local via VITE_GOOGLE_MAPS_API_KEY or overridden here."
-            />
-          )}
-
           {/* Map Style Theme */}
           <Box>
             <FormLabel

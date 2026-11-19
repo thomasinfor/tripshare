@@ -32,8 +32,7 @@ import {
   savePhotoDrafts,
 } from './utils/photoDrafts';
 
-const DEFAULT_GOOGLE_MAPS_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBUIiyAlQcrDC8hK9ho_Oep3u81_bSvSQ8';
+const ENV_GOOGLE_MAPS_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
 
 const extraTripModules = import.meta.glob('./data/trips/*.json', {
   eager: true,
@@ -219,18 +218,18 @@ const TripViewer: React.FC<TripViewerProps> = ({
 
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [mapProvider, setMapProvider] = useState<MapProvider>(() => {
-    return (localStorage.getItem('tripshare_provider') as MapProvider) || 'google';
-  });
+  const mapProvider: MapProvider = ENV_GOOGLE_MAPS_KEY ? 'google' : 'leaflet';
   const [mapStyle, setMapStyle] = useState<MapStyle>(() => {
     return (localStorage.getItem('tripshare_style_paper') as MapStyle) || 'streets';
   });
-  const [googleApiKey, setGoogleApiKey] = useState<string>(() => {
-    return (
-      localStorage.getItem('tripshare_google_key') ||
-      DEFAULT_GOOGLE_MAPS_KEY
-    );
+  const [showAllDayRoute, setShowAllDayRoute] = useState<boolean>(() => {
+    return localStorage.getItem('tripshare_show_day_route') !== 'false';
   });
+
+  useEffect(() => {
+    localStorage.removeItem('tripshare_google_key');
+    localStorage.removeItem('tripshare_provider');
+  }, []);
 
   const effectiveTrip = useMemo<NormalizedTrip>(() => {
     if (!import.meta.env.DEV || pendingPhotoChangeCount === 0) return trip;
@@ -320,17 +319,13 @@ const TripViewer: React.FC<TripViewerProps> = ({
 
   // Save Settings
   const handleSaveSettings = (config: {
-    provider: MapProvider;
     mapStyle: MapStyle;
-    googleApiKey: string;
     showAllDayRoute: boolean;
   }) => {
-    setMapProvider(config.provider);
     setMapStyle(config.mapStyle);
-    setGoogleApiKey(config.googleApiKey);
-    localStorage.setItem('tripshare_provider', config.provider);
+    setShowAllDayRoute(config.showAllDayRoute);
     localStorage.setItem('tripshare_style_paper', config.mapStyle);
-    localStorage.setItem('tripshare_google_key', config.googleApiKey);
+    localStorage.setItem('tripshare_show_day_route', String(config.showAllDayRoute));
   };
 
   const handleCycleMapStyle = () => {
@@ -726,18 +721,14 @@ const TripViewer: React.FC<TripViewerProps> = ({
           >
             {mapProvider === 'google' ? (
               <GoogleMapView
-                apiKey={googleApiKey}
+                apiKey={ENV_GOOGLE_MAPS_KEY}
                 viewMode={viewMode}
                 allDays={trip.days}
                 currentDayIndex={currentDayIndex}
                 currentSpotIndex={currentSpotIndex}
                 mapStyle={mapStyle}
+                showAllDayRoute={showAllDayRoute}
                 onSelectSpot={handleSelectSpot}
-                onSwitchToLeaflet={() => {
-                  setMapProvider('leaflet');
-                  localStorage.setItem('tripshare_provider', 'leaflet');
-                }}
-                onConfigureKey={() => setIsSettingsOpen(true)}
               />
             ) : (
               <LeafletMap
@@ -746,6 +737,7 @@ const TripViewer: React.FC<TripViewerProps> = ({
                 currentDayIndex={currentDayIndex}
                 currentSpotIndex={currentSpotIndex}
                 mapStyle={mapStyle}
+                showAllDayRoute={showAllDayRoute}
                 onSelectSpot={handleSelectSpot}
                 onSelectDay={handleSelectDay}
               />
@@ -811,10 +803,8 @@ const TripViewer: React.FC<TripViewerProps> = ({
       {/* Map & App Configuration Modal */}
       {isSettingsOpen && (
         <MapConfigModal
-          provider={mapProvider}
           mapStyle={mapStyle}
-          googleApiKey={googleApiKey}
-          showAllDayRoute={true}
+          showAllDayRoute={showAllDayRoute}
           onClose={() => setIsSettingsOpen(false)}
           onSave={handleSaveSettings}
         />
